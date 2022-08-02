@@ -1,8 +1,20 @@
+from flask import make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from flask_restful import Api
 from milvus import Milvus, IndexType, MetricType, Status
 from settings import MILVUS_HOST, MILVUS_PORT
 
 db = SQLAlchemy()
+
+api = Api()
+
+
+# 设置自动使用的序列化器
+@api.representation('application/json')
+def output_json(data, code, headers=None):
+    resp = make_response(jsonify(data), code)
+    resp.headers.extend(headers or {})
+    return resp
 
 
 # 暂时用Milvus, 还没测PgVector（postgresql的插件）
@@ -79,3 +91,6 @@ class MilvusUtil:
             return status, results
         except Exception as e:
             print('Milvus search error: ', e)
+
+
+milvus = MilvusUtil()

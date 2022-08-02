@@ -6,8 +6,9 @@ from flask import Flask, request, render_template, jsonify
 from flask_cors import CORS
 from flask_migrate import Migrate
 
+from crud import QuestionAPI, QuestionGroupAPI
 from settings import TestConfig
-from ext import db, MilvusUtil
+from ext import db, api, milvus
 from models import User, Question, QuestionSet
 import rocketqa
 
@@ -18,7 +19,10 @@ app.config.from_object(TestConfig)
 db.init_app(app)
 migrate = Migrate(app, db)
 CORS(app, supports_credentials=True)  # 允许跨域
-milvus = MilvusUtil()
+
+api.add_resource(QuestionAPI, '/api/question/<int:qid>')
+api.add_resource(QuestionGroupAPI, '/api/question')
+api.init_app(app)
 
 
 @app.cli.command()
@@ -140,75 +144,7 @@ def _query(query_str, set_id):
 
 # CRUD
 
-
-# GET 显示数据并不全，很多字段都没显示
-# 或许 GET 加参数来决定需不需要某些数据？
-# 问题库包含的问题，数据量可能比较大
-# 但是用户可能只需要问题库名字？
-@app.route('/api/question/<qid>', methods=['GET'])  # 可能改成批量？同理DELETE
-def question_get(qid):
-    question = Question.query.get(qid)
-    if question:
-        return jsonify({'code': 200,
-                        'questions': [
-                            {'title': question.title, 'content': question.content}
-                        ]})
-    return jsonify({'code': 418, 'msg': "I'm a teapot. Question doesn't exist. "})
-
-
-@app.route('/api/question', methods=['POST'])  # 这个也可以改批量
-def question_create():
-    title = request.json.get('title')
-    content = request.json.get('content')
-
-    if title is None or content is None:
-        return jsonify({'code': 418, 'msg': "I'm a teapot"})
-
-    embedding = json.dumps(rocketqa.get_embedding(title))
-    # json.dumps 现在和 jsonify 是混用的
-    question = Question(title=title, content=content, embedding=embedding)
-    db.session.add(question)
-    db.session.commit()
-    return jsonify({'code': 200, 'msg': '问题创建成功'})
-
-
-@app.route('/api/question', methods=['PUT'])
-def question_update():
-    qid = request.json.get('id')
-    title = request.json.get('title')
-    content = request.json.get('content')
-
-    if qid is None or title is None or content is None:
-        return jsonify({'code': 418, 'msg': "I'm a teapot"})
-
-    question = Question.query.get(qid)
-    if question:
-        embedding = json.dumps(rocketqa.get_embedding(title))
-        Question.title = title
-        Question.content = content
-        Question.embedding = embedding
-        # TODO
-        # 更改所有相关Milvus库
-        db.session.submit()
-        return jsonify({'code': 200, 'msg': '问题更新成功'})
-    return jsonify({'code': 418, 'msg': "I'm a teapot. Question doesn't exist. "})
-
-
-# 删除都没测试，慎用
-@app.route('/api/question/<qid>', methods=['DELETE'])
-def question_delete(qid):
-    question = Question.query.get(qid)
-    if question:
-        embedding = Question.embedding
-        db.session.delete(question)
-        # TODO
-        # 在所有相关Milvus库中删除
-        db.session.submit()
-        return jsonify({'code': 200, 'msg': '问题删除成功'})
-    return jsonify({'code': 418, 'msg': "I'm a teapot. Question doesn't exist."})
-
-
-@app.route('/api/question_set/<sid>', methods=['GET'])
+@app.route('/api/question_set/<int:sid>', methods=['GET'])
 def set_get(sid):
     question_set = QuestionSet.query.get(sid)
     if question_set:
@@ -227,15 +163,16 @@ def set_create():
     name = request.json.get('name')
     qids = request.json.get('questions')
 
-    if name is None or qids is None:
+    if name is None:
         return jsonify({'code': 418, 'msg': "I'm a teapot"})
 
     qs = QuestionSet(name=name)
     embeddings = []
-    for qid in qids:
-        question = Question.query.get(qid)
-        qs.questions.append(question)
-        embeddings.append(json.loads(question.embedding))
+    if qids:
+        for qid in qids:
+            question = Question.query.get(qid)
+            qs.questions.append(question)
+            embeddings.append(json.loads(question.embedding))
     db.session.add(qs)
     db.session.commit()
 
@@ -253,14 +190,13 @@ def set_update():
     set_id = request.json.get('id')
     qids = request.json.get('questions')
 
-    if op is None or set_id is None or qids is None:
+    if op is None or set_id is None or not qids:
         return jsonify({'code': 418, 'msg': "I'm a teapot"})
 
     qs = QuestionSet.query.get(set_id)
-    if qs is None:  # 或许这里不是None? 可能有什么别的表示?
+    if qs is None:
         return jsonify({'code': 418, 'msg': "I'm a teapot. Set doesn't exist."})
 
-    # 缺少判断 qids 是否为空
     questions = [Question.query.get(qid) for qid in qids]
 
     if op == 'append':  # 没有检测能不能增加，能不能删除
@@ -282,10 +218,7 @@ def set_update():
         milvus.delete('_' + str(qs.id), qids)
 
         return jsonify({'code': 200, 'msg': '问题库移除问题'})
-    # elif op == 'edit':
-    #     qs.questions = [question for question in questions]
-    #     db.session.commit()
-    #     return 'edit'
+
     return jsonify({'code': 418, 'msg': "I'm a teapot. Can't understand operation."})
 
 
