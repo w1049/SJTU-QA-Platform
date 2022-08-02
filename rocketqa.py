@@ -4,7 +4,14 @@ import json
 
 
 def get_embedding(query):
-    input_data = {'step': 1, 'query': query}
+    input_data = {'step': 1, 'query': [query]}
+    result = requests.post(ROCKETQA_URL, json=input_data)
+    res_json = json.loads(result.text)
+    return res_json['result'][0]
+
+
+def get_embeddings(queries):
+    input_data = {'step': 1, 'query': queries}
     result = requests.post(ROCKETQA_URL, json=input_data)
     res_json = json.loads(result.text)
     return res_json['result']

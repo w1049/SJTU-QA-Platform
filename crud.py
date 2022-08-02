@@ -1,10 +1,13 @@
 import json
+import time
 
+import click
 from flask_restful import Resource, reqparse
+from sqlalchemy.exc import IntegrityError
 
 import rocketqa
 from ext import db, milvus
-from models import Question
+from models import Question, QuestionSet
 
 
 class QuestionAPI(Resource):
@@ -33,19 +36,19 @@ class QuestionAPI(Resource):
             question.title = title
             question.content = content
             question.embedding = json.dumps(embedding)
-            for qs in question.belongs.all():
-                collection_name = '_' + str(qs.id)
+            db.session.commit()
+            for sid in question.belongs.with_entities(QuestionSet.id).all():
+                collection_name = '_' + str(sid[0])
                 milvus.delete(collection_name, [qid])
                 milvus.insert(collection_name, [embedding], [qid])
-            db.session.commit()
             return {'message': '问题更新成功'}
         return {'message': '问题不存在'}, 400
 
     def delete(self, qid):
         question = Question.query.get(qid)
         if question:
-            for qs in question.belongs.all():
-                collection_name = '_' + str(qs.id)
+            for sid in question.belongs.with_entities(QuestionSet.id).all():
+                collection_name = '_' + str(sid[0])
                 milvus.delete(collection_name, [qid])
             db.session.delete(question)
             db.session.commit()
@@ -54,17 +57,149 @@ class QuestionAPI(Resource):
 
 
 class QuestionGroupAPI(Resource):
+
+    def get(self):  # 批量获取信息
+        pass
+
     def post(self):
         args = reqparse.RequestParser() \
-            .add_argument('title', type=str, location='json', required=True, help='标题不能为空') \
-            .add_argument('content', type=str, location='json', required=True, help='内容不能为空') \
+            .add_argument('many', type=int, location='json', default=0) \
+            .add_argument('title', type=str, location='json', action='append', required=True, help='标题不能为空') \
+            .add_argument('content', type=str, location='json', action='append', required=True, help='内容不能为空') \
             .parse_args()
-        title = args['title']
-        content = args['content']
 
-        embedding = json.dumps(rocketqa.get_embedding(title))  # dumps 只出现在了这里
+        titles = args['title']
+        contents = args['content']
 
-        question = Question(title=title, content=content, embedding=embedding)
-        db.session.add(question)
+        if len(titles) == 1 and len(contents) == 1 and args['many'] == 0:
+            title, content = titles[0], contents[0]
+            embedding = json.dumps(rocketqa.get_embedding(title))  # dumps 只出现在了这里
+            question = Question(title=title, content=content, embedding=embedding)
+            db.session.add(question)
+            db.session.commit()
+            return {'message': '问题创建成功', 'id': question.id}
+        if len(titles) == len(contents) and args['many'] == 1:
+            embeddings = rocketqa.get_embeddings(titles)
+            questions = []
+            for title, content, embedding in zip(titles, contents, embeddings):
+                question = Question(title=title, content=content, embedding=json.dumps(embedding))
+                questions.append(question)
+            db.session.add_all(questions)
+            db.session.commit()
+            return {'message': '问题创建成功', 'id': [question.id for question in questions]}
+        return {'message': '问题创建失败'}, 400
+
+
+class QuestionSetAPI(Resource):
+
+    def get(self, sid):
+        question_set = QuestionSet.query.get(sid)
+        if question_set:
+            return {'id': sid,
+                    'name': question_set.name,
+                    'questions': [qid[0] for qid in question_set.questions.with_entities(Question.id).all()]
+                    # 这里不知道有没有效率问题   update:改了一下 只要qid
+                    }
+        return {'message': '问题库不存在'}, 400
+
+    def put(self, sid):
+        args = reqparse.RequestParser() \
+            .add_argument('op', type=str, location='json', required=True, help='操作不能为空') \
+            .add_argument('name', type=str, location='json') \
+            .add_argument('questions', type=int, action='append', location='json') \
+            .parse_args()
+        op = args['op']
+        name = args['name']
+        qids = args['questions']
+
+        qs = QuestionSet.query.get(sid)
+        if qs is None:
+            return {'message': '问题库不存在'}, 400
+
+        if op == 'append':
+            if not qids:
+                return {'message': '问题ID不能为空'}, 400
+            start = time.time()
+            questions = Question.query.filter(Question.id.in_(qids)).all()
+            qs.questions.extend(questions)
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return {'message': '不要重复插入问题'}, 400
+
+            embeddings = [json.loads(question.embedding) for question in questions]
+
+            end = time.time()
+            click.echo("sql time: {}s".format(end - start))
+
+            milvus.insert('_' + str(sid), embeddings, qids)
+            end2 = time.time()
+            click.echo("milvus time: {}s".format(end2 - end))
+            return {'message': '问题库增加问题'}
+
+        elif op == 'remove':
+            if not qids:
+                return {'message': '问题ID不能为空'}, 400
+            questions = Question.query.filter(Question.id.in_(qids)).all()
+            for question in questions:
+                qs.questions.remove(question)
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                return {'message': '未插入的问题'}, 400
+
+            milvus.delete('_' + str(sid), qids)
+            return {'message': '问题库移除问题'}
+
+        elif op == 'rename':
+            if not name:
+                return {'message': '名称不能为空'}, 400
+            qs.name = name
+            db.session.commit()
+            return {'message': '问题库更名'}
+
+        return {'message': '无法理解的操作'}, 400
+
+    def delete(self, sid):
+        qs = QuestionSet.query.get(sid)
+        if qs:
+            milvus.drop_collection('_' + str(qs.id))
+            db.session.delete(qs)
+            db.session.commit()
+            return {'message': '问题库删除成功'}
+        return {'message': '问题库不存在'}, 400
+
+
+class QuestionSetGroupAPI(Resource):
+
+    def post(self):
+        args = reqparse.RequestParser() \
+            .add_argument('name', type=str, location='json', required=True, help='名称不能为空') \
+            .parse_args()
+        # .add_argument('questions', default=[], type=int, action='append', location='json', help='问题ID不合法') \
+
+        name = args['name']
+        # qids = args['questions']
+
+        qs = QuestionSet(name=name)
+        # embeddings = []
+        # if qids:
+        #     questions = Question.query.fliter(Question.id.in_(qids)).all()
+        #     if len(questions) != len(qids):
+        #         return {'message': '检查问题'}, 400
+        #     qs.questions.extend(questions)
+        #     embeddings = [json.loads(question.embedding) for question in questions]
+        # for qid in qids:
+        #     question = Question.query.get(qid)
+        #     qs.questions.append(question)
+        #     embeddings.append(json.loads(question.embedding))
+        db.session.add(qs)
         db.session.commit()
-        return {'message': '问题创建成功', 'id': question.id}
+
+        collection_name = '_' + str(qs.id)
+        milvus.create_collection(collection_name)  # 按理说这个名字的 collection 是不存在的
+        # if len(embeddings) > 0:
+        #     milvus.insert(collection_name, embeddings, qids)
+        return {'message': '问题库创建成功'}

@@ -11,17 +11,19 @@ class User(db.Model):
 
 set2user = db.Table('set2user',
                     db.Column('set_id', db.Integer, db.ForeignKey('question_set.id')),
-                    db.Column('user_id', db.Integer, db.ForeignKey('user.id')))
+                    db.Column('user_id', db.Integer, db.ForeignKey('user.id')),
+                    db.PrimaryKeyConstraint('set_id', 'user_id'))
 
 set2question = db.Table('set2question',
                         db.Column('set_id', db.Integer, db.ForeignKey('question_set.id')),
-                        db.Column('question_id', db.Integer, db.ForeignKey('question.id')))
+                        db.Column('question_id', db.Integer, db.ForeignKey('question.id')),
+                        db.PrimaryKeyConstraint('set_id', 'question_id'))
 
 
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(255))
-    content = db.Column(db.String(2022))
+    content = db.Column(db.String(3000))
     embedding = db.Column(db.JSON)  # 好像实际上存的是 String?
     modified_at = db.Column(db.DateTime, default=datetime.now)
     modified_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))

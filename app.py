@@ -6,7 +6,7 @@ from flask import Flask, request, render_template, jsonify
 from flask_cors import CORS
 from flask_migrate import Migrate
 
-from crud import QuestionAPI, QuestionGroupAPI
+from crud import QuestionAPI, QuestionGroupAPI, QuestionSetAPI, QuestionSetGroupAPI
 from settings import TestConfig
 from ext import db, api, milvus
 from models import User, Question, QuestionSet
@@ -22,6 +22,8 @@ CORS(app, supports_credentials=True)  # 允许跨域
 
 api.add_resource(QuestionAPI, '/api/question/<int:qid>')
 api.add_resource(QuestionGroupAPI, '/api/question')
+api.add_resource(QuestionSetAPI, '/api/question_set/<int:sid>')
+api.add_resource(QuestionSetGroupAPI, '/api/question_set')
 api.init_app(app)
 
 
@@ -42,9 +44,14 @@ def milvus_init():
         milvus.client.drop_collection(collection)
 
 
-# @app.cli.command()
-# def test():
-# click.echo(app.config['MILVUS_HOST'])
+@app.cli.command()
+def test():
+    start = time.time()
+    qs = QuestionSet.query.get(1)
+    x = [q[0] for q in qs.questions.with_entities(Question.id).all()]
+    end = time.time()
+    print(x)
+    click.echo("cost: {}s".format(end - start))
 
 
 @app.cli.command()
@@ -99,8 +106,7 @@ def register():
     return 'hello, GET!'
 
 
-# query 还没改名，预计变成/api/query
-@app.route('/query', methods=['GET', 'POST'])
+@app.route('/api/query', methods=['GET', 'POST'])
 def query():
     if request.method == 'POST':
         query_str = request.json.get('query')
@@ -127,6 +133,8 @@ def _query(query_str, set_id):
     name = '_' + str(set_id)
     status, search_result = milvus.search(name, embedding, 5)
     qids = []
+    if not search_result:
+        return jsonify({'message': "I'm a teapot"}), 418
     for each_distance in search_result[0]:
         qids.append(each_distance.id)
     end = time.time()
@@ -139,87 +147,7 @@ def _query(query_str, set_id):
         output.append({'title': question.title, 'content': question.content})
     end = time.time()
     click.echo("sql time: {}s".format(end - start))
-    return json.dumps(output, ensure_ascii=False)
-
-
-# CRUD
-
-@app.route('/api/question_set/<int:sid>', methods=['GET'])
-def set_get(sid):
-    question_set = QuestionSet.query.get(sid)
-    if question_set:
-        return jsonify({'code': 200,
-                        'question_set': {'name': question_set.name,
-                                         'questions': [question.id for question in question_set.questions]
-                                         # 这里不知道有没有效率问题
-                                         }
-                        })
-    return jsonify({'code': 418, 'msg': "I'm a teapot. Set doesn't exist. "})
-
-
-@app.route('/api/question_set', methods=['POST'])
-def set_create():
-    # 测试的时候这个函数耗时比较长，还没测是sql慢还是milvus慢
-    name = request.json.get('name')
-    qids = request.json.get('questions')
-
-    if name is None:
-        return jsonify({'code': 418, 'msg': "I'm a teapot"})
-
-    qs = QuestionSet(name=name)
-    embeddings = []
-    if qids:
-        for qid in qids:
-            question = Question.query.get(qid)
-            qs.questions.append(question)
-            embeddings.append(json.loads(question.embedding))
-    db.session.add(qs)
-    db.session.commit()
-
-    collection_name = '_' + str(qs.id)
-    milvus.create_collection(collection_name)  # 按理说这个名字的 collection 是不存在的
-    if len(embeddings) > 0:
-        milvus.insert(collection_name, embeddings, qids)
-    # 可能 commit 要放到最后面？不是很懂万一出现中断怎么办
-    return jsonify({'code': 200, 'msg': '问题库创建成功'})
-
-
-@app.route('/api/question_set', methods=['PUT'])
-def set_update():
-    op = request.json.get('op')
-    set_id = request.json.get('id')
-    qids = request.json.get('questions')
-
-    if op is None or set_id is None or not qids:
-        return jsonify({'code': 418, 'msg': "I'm a teapot"})
-
-    qs = QuestionSet.query.get(set_id)
-    if qs is None:
-        return jsonify({'code': 418, 'msg': "I'm a teapot. Set doesn't exist."})
-
-    questions = [Question.query.get(qid) for qid in qids]
-
-    if op == 'append':  # 没有检测能不能增加，能不能删除
-        embeddings = []
-        for question in questions:
-            qs.questions.append(question)
-            embeddings.append(json.loads(question.embedding))
-        db.session.commit()
-
-        milvus.insert('_' + str(qs.id), embeddings, qids)
-
-        return jsonify({'code': 200, 'msg': '问题库增加问题'})
-
-    elif op == 'remove':
-        for question in questions:
-            qs.questions.remove(question)
-        db.session.commit()
-
-        milvus.delete('_' + str(qs.id), qids)
-
-        return jsonify({'code': 200, 'msg': '问题库移除问题'})
-
-    return jsonify({'code': 418, 'msg': "I'm a teapot. Can't understand operation."})
+    return jsonify(output)
 
 
 if __name__ == '__main__':

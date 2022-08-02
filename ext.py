@@ -43,6 +43,14 @@ class MilvusUtil:
         except Exception as e:
             print("Milvus create collection error:", e)
 
+    def drop_collection(self, name):
+        try:
+            status = self.client.drop_collection(name)
+            print(status)
+            return status
+        except Exception as e:
+            print("Milvus drop collection error:", e)
+
     def create_index(self, name):
         param = {'nlist': 1000}
         try:
