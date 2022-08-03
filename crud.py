@@ -32,7 +32,7 @@ class QuestionAPI(Resource):
 
         question = Question.query.get(qid)
         if question:
-            embedding = rocketqa.get_embedding(title)
+            embedding = rocketqa.get_para(title, content)
             question.title = title
             question.content = content
             question.embedding = json.dumps(embedding)
@@ -73,12 +73,12 @@ class QuestionGroupAPI(Resource):
 
         if len(titles) == 1 and len(contents) == 1 and args['many'] == 0:
             title, content = titles[0], contents[0]
-            embedding = json.dumps(rocketqa.get_embedding(title))  # dumps 只出现在了这里
+            embedding = json.dumps(rocketqa.get_para(title, content))  # dumps 只出现在了这里
             question = Question(title=title, content=content, embedding=embedding)
             db.session.add(question)
             db.session.commit()
             return {'message': '问题创建成功', 'id': question.id}
-        if len(titles) == len(contents) and args['many'] == 1:
+        if len(titles) == len(contents) and args['many'] == 1:  # 暂时不要用这个，没改好
             embeddings = rocketqa.get_embeddings(titles)
             questions = []
             for title, content, embedding in zip(titles, contents, embeddings):

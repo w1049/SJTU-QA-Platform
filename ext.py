@@ -35,7 +35,7 @@ class MilvusUtil:
                 'collection_name': name,
                 'dimension': 768,
                 'index_file_size': 256,
-                'metric_type': MetricType.IP
+                'metric_type': MetricType.L2
             }
             status = self.client.create_collection(param)
             print(status)
@@ -94,8 +94,8 @@ class MilvusUtil:
             status, results = self.client.search(
                 collection_name=name,
                 query_records=[vector],  # 可以批量
-                top_k=top_k,
-                params=param)
+                top_k=top_k)
+                # params=param)
             return status, results
         except Exception as e:
             print('Milvus search error: ', e)

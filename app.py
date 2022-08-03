@@ -118,6 +118,18 @@ def query():
     return _query(query_str, set_id)
 
 
+@app.route('/q/<query_str>', methods=['GET'])  # 给机器人用着玩玩的
+def q(query_str):
+    ret = _query(query_str, 1)
+    obj = ret.json
+    a = '<html><body><div>'
+    for ans in obj:
+        a += '<h3>' + ans['title'] + '</h3>\n'
+        a += '<p>' + ans['content'] + '</p>\n'
+    a += '</div></body></html>'
+    return a
+
+
 def _query(query_str, set_id):
     start = time.time()
     if set_id is None:
