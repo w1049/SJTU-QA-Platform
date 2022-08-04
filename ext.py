@@ -1,9 +1,10 @@
 from flask import make_response, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from flask_restful import Api
 from flask_login import LoginManager
-from milvus import Milvus, IndexType, MetricType, Status
-from settings import MILVUS_HOST, MILVUS_PORT
+from flask_restful import Api
+from flask_sqlalchemy import SQLAlchemy
+from milvus import Milvus, IndexType, MetricType
+
+from config import MILVUS_HOST, MILVUS_PORT
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -96,7 +97,7 @@ class MilvusUtil:
                 collection_name=name,
                 query_records=[vector],  # 可以批量
                 top_k=top_k)
-                # params=param)
+            # params=param)
             return status, results
         except Exception as e:
             print('Milvus search error: ', e)

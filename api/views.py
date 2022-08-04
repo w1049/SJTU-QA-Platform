@@ -4,10 +4,9 @@ import time
 import click
 from flask_login import login_required, current_user
 from flask_restful import Resource, reqparse
-from sqlalchemy.exc import IntegrityError
 
 import rocketqa
-from ext import db, milvus
+from ext import db, milvus, api
 from models import Question, QuestionSet
 
 
@@ -19,6 +18,7 @@ def can_maintain(user, question_set):
     return False
 
 
+@api.resource('/question/<int:qid>')
 class QuestionAPI(Resource):
     decorators = [login_required]
 
@@ -70,6 +70,7 @@ class QuestionAPI(Resource):
         return {'message': '问题不存在'}, 400
 
 
+@api.resource('/question')
 class QuestionGroupAPI(Resource):
     decorators = [login_required]
 
@@ -107,6 +108,7 @@ class QuestionGroupAPI(Resource):
         return {'message': '问题创建失败'}, 400
 
 
+@api.resource('/question_set/<int:sid>')
 class QuestionSetAPI(Resource):
     decorators = [login_required]
 
@@ -203,6 +205,7 @@ class QuestionSetAPI(Resource):
         return {'message': '问题库不存在'}, 400
 
 
+@api.resource('/question_set')
 class QuestionSetGroupAPI(Resource):
     decorators = [login_required]
 

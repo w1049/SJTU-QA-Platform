@@ -6,7 +6,7 @@ s = [i for i in range(1, 5001)]
 
 
 def aq():
-    corpus_file = 'qa_pair.csv'
+    corpus_file = '../qa_pair.csv'
     nq = []
     na = []
     with open(corpus_file, 'r', encoding='utf-8') as f:
