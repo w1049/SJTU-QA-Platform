@@ -1,12 +1,15 @@
 from datetime import datetime
 from ext import db
+from flask_login import UserMixin
 
 
-class User(db.Model):
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255))
+    name = db.Column(db.String(255), nullable=False)
     institution = db.Column(db.String(255))
-    # role
+    role = db.Column(db.Enum(
+        'User', 'Admin', name='roles'
+    ), server_default='User', nullable=False)
 
 
 set2user = db.Table('set2user',
@@ -22,10 +25,10 @@ set2question = db.Table('set2question',
 
 class Question(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title = db.Column(db.String(255))
-    content = db.Column(db.String(3000))
-    embedding = db.Column(db.JSON)  # 好像实际上存的是 String?
-    modified_at = db.Column(db.DateTime, default=datetime.now)
+    title = db.Column(db.String(255), nullable=False)
+    content = db.Column(db.String(3000), nullable=False)
+    embedding = db.Column(db.JSON, nullable=False)  # 好像实际上存的是 String?
+    modified_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     modified_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     modified_by = db.relationship('User', backref='modified_question', uselist=False, foreign_keys=[modified_by_id])
     belongs = db.relationship('QuestionSet', secondary=set2question, back_populates='questions', lazy='dynamic')
@@ -37,26 +40,18 @@ class Question(db.Model):
 class QuestionSet(db.Model):
     # 预计大公共库占用 id=1
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255))
+    name = db.Column(db.String(255), nullable=False)
     questions = db.relationship('Question', secondary=set2question, back_populates='belongs', lazy='dynamic')
     owner_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     owner = db.relationship('User', backref='own', uselist=False, foreign_keys=[owner_id])
     maintainer = db.relationship('User', secondary=set2user, backref='maintain', lazy='dynamic')
-    modified_at = db.Column(db.DateTime, default=datetime.now)
+    modified_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     modified_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     modified_by = db.relationship('User', backref='modified_set', uselist=False, foreign_keys=[modified_by_id])
     created_at = db.Column(db.DateTime, default=datetime.now)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     created_by = db.relationship('User', backref='created_set', uselist=False, foreign_keys=[created_by_id])
-    # permission
+    permission = db.Column(db.Enum(
+        'Public', 'Protected', 'Private', name='permissions'
+    ), server_default='Private', nullable=False)
     # passwd
-
-
-class Permission(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    # Public, Protected, Private
-
-
-class Role(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    # User, Admin

@@ -2,13 +2,15 @@ import json
 import time
 
 import click
+import flask_login
 from flask import Flask, request, render_template, jsonify
 from flask_cors import CORS
+from flask_login import login_required
 from flask_migrate import Migrate
 
 from crud import QuestionAPI, QuestionGroupAPI, QuestionSetAPI, QuestionSetGroupAPI
 from settings import TestConfig
-from ext import db, api, milvus
+from ext import db, api, milvus, login_manager
 from models import User, Question, QuestionSet
 import rocketqa
 
@@ -19,6 +21,7 @@ app.config.from_object(TestConfig)
 db.init_app(app)
 migrate = Migrate(app, db)
 CORS(app, supports_credentials=True)  # 允许跨域
+login_manager.init_app(app)
 
 api.add_resource(QuestionAPI, '/api/question/<int:qid>')
 api.add_resource(QuestionGroupAPI, '/api/question')
@@ -160,6 +163,28 @@ def _query(query_str, set_id):
     end = time.time()
     click.echo("sql time: {}s".format(end - start))
     return jsonify(output)
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
+@app.route('/login/<int:uid>', methods=['GET'])
+def login(uid):
+    user = User.query.get(uid)
+    if user:
+        flask_login.login_user(user)
+        return 'Hello, {}!'.format(user.name)
+    else:
+        return '不存在！', 400
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    flask_login.logout_user()
+    return 'Logged out'  # redirect somewhere
 
 
 if __name__ == '__main__':

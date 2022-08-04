@@ -1,11 +1,12 @@
 from flask import make_response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import Api
+from flask_login import LoginManager
 from milvus import Milvus, IndexType, MetricType, Status
 from settings import MILVUS_HOST, MILVUS_PORT
 
 db = SQLAlchemy()
-
+login_manager = LoginManager()
 api = Api()
 
 
