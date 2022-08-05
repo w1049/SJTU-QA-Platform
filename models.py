@@ -7,7 +7,7 @@ from ext import db
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(255), nullable=False)
+    name = db.Column(db.String(255), nullable=False, unique=True)
     institution = db.Column(db.String(255))
     role = db.Column(db.Enum(
         'User', 'Admin', name='roles'

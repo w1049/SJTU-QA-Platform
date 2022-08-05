@@ -13,10 +13,11 @@ def create_app(config_name='test'):
 
     CORS(app, supports_credentials=True)  # 允许跨域
 
-    from ext import db, login_manager
+    from ext import db, login_manager, oauth
     db.init_app(app)
     migrate = Migrate(app, db)
     login_manager.init_app(app)
+    oauth.init_app(app)
 
     from api import api_bp
     app.register_blueprint(api_bp, url_prefix='/api')

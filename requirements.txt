@@ -5,9 +5,11 @@ Flask_Login==0.6.2
 Flask_Migrate==3.1.0
 Flask_RESTful==0.3.9
 Flask_SQLAlchemy==2.5.1
-grpcio==1.48.0
-ujson==5.4.0
 requests==2.28.1
-protobuf==3.20.0
 psycopg2_binary==2.9.3
 python_dotenv==0.20.0
+authlib==1.0.1
+
+protobuf==3.20.0
+grpcio==1.48.0
+ujson==5.4.0
