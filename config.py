@@ -1,3 +1,6 @@
+import os
+
+
 class BaseConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = True  # 支持追踪修改
 
@@ -9,7 +12,7 @@ class BaseConfig:
 class TestConfig(BaseConfig):
     SQLALCHEMY_DATABASE_URI = "postgresql+psycopg2://admin:123456@192.168.124.4:5432/test"
     JSON_AS_ASCII = False
-    SECRET_KEY = 'e6a21f29d457273ab0a840adb65c6d98ff1b64655fd1f7d0e02f99f3ba0fa2fb'
+    SECRET_KEY = os.getenv('SECRET_KEY', default='l926o8I7')
 
 
 MILVUS_HOST = "192.168.124.4"
