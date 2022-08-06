@@ -2,7 +2,7 @@ import json
 
 import requests
 
-from config import ROCKETQA_URL
+from .config import ROCKETQA_URL
 
 
 def get_embedding(query):

@@ -1,24 +1,6 @@
-from flask import make_response, jsonify
-from flask_login import LoginManager
-from flask_restful import Api
-from flask_sqlalchemy import SQLAlchemy
-from authlib.integrations.flask_client import OAuth
 from milvus import Milvus, IndexType, MetricType
 
-from config import MILVUS_HOST, MILVUS_PORT
-
-db = SQLAlchemy()
-login_manager = LoginManager()
-api = Api()
-oauth = OAuth()
-
-
-# 设置自动使用的序列化器
-@api.representation('application/json')
-def output_json(data, code, headers=None):
-    resp = make_response(jsonify(data), code)
-    resp.headers.extend(headers or {})
-    return resp
+from .config import MILVUS_HOST, MILVUS_PORT
 
 
 # 暂时用Milvus, 还没测PgVector（postgresql的插件）
