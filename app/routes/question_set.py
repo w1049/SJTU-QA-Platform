@@ -121,7 +121,8 @@ def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = 
 
 
 @router.get('/', response_model=List[schemas.QuestionSetModel])
-def get_question_sets(db: Session = Depends(get_db)):
+def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+    # if admin
     return db.query(QuestionSet).all()
 
 

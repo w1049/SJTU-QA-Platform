@@ -18,7 +18,7 @@ router = APIRouter(
 
 
 @router.get('/{qid}', response_model=schemas.QuestionModel, responses={404: {'model': HTTPError}})
-def get_question(qid: int, db: Session = Depends(get_db)):
+def get_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     question = db.query(Question).get(qid)
     if question:
         return question
@@ -48,7 +48,7 @@ def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depend
 
 
 @router.delete('/{qid}', responses={404: {'model': HTTPError}})
-def delete_question(qid: int, db: Session = Depends(get_db)):
+def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     question = db.query(Question).get(qid)
     if question:
         for sid in question.belongs.with_entities(QuestionSet.id).all():
@@ -61,7 +61,7 @@ def delete_question(qid: int, db: Session = Depends(get_db)):
 
 
 @router.get('/', response_model=List[schemas.QuestionModel])
-def get_questions(db: Session = Depends(get_db)):
+def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     return db.query(Question).all()
 
 
