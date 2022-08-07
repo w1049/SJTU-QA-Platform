@@ -61,8 +61,8 @@ def delete_question(qid: int, db: Session = Depends(get_db)):
 
 
 @router.get('/', response_model=List[schemas.QuestionModel])
-def get_questions():
-    return [{'username': 'Rick'}, {'username': 'Morty'}]
+def get_questions(db: Session = Depends(get_db)):
+    return db.query(Question).all()
 
 
 @router.post('/', response_model=schemas.QuestionModel, status_code=status.HTTP_201_CREATED)

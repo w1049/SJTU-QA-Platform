@@ -1,5 +1,6 @@
 import json
 import time
+from typing import List
 
 import click
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -119,9 +120,9 @@ def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
 
 
-@router.get('/')
-def get_question_sets():
-    return [{'username': 'Rick'}, {'username': 'Morty'}]
+@router.get('/', response_model=List[schemas.QuestionSetModel])
+def get_question_sets(db: Session = Depends(get_db)):
+    return db.query(QuestionSet).all()
 
 
 @router.post('/', response_model=schemas.QuestionSetModel, status_code=status.HTTP_201_CREATED)
