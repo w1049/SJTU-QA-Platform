@@ -31,8 +31,8 @@ oauth.register(
 )
 
 
-@router.get('/login/{user_id}')
-async def login(request: Request, user_id: int, db: Session = Depends(get_db)):
+@router.get('/login_id/{user_id}')
+async def login_id(request: Request, user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail='User not found')

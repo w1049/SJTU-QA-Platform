@@ -1,4 +1,4 @@
-from fastapi import Request, HTTPException
+from fastapi import Request, HTTPException, status
 
 from .database import SessionLocal
 
@@ -16,4 +16,4 @@ async def get_user(request: Request):
     if user is not None:
         return user
     else:
-        raise HTTPException(status_code=403, detail="Could not validate credentials.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Please login")

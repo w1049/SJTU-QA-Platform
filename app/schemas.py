@@ -76,3 +76,12 @@ class QuestionSetUpdate(BaseModel):
     operation: str
     name: Optional[str]
     question_ids: Optional[List[int]]
+
+
+class HTTPError(BaseModel):
+    detail: str
+
+    class Config:
+        schema_extra = {
+            'example': {'detail': 'HTTPException raised.'}
+        }

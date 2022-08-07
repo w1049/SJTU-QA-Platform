@@ -1,31 +1,32 @@
 import json
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from .. import schemas, rocketqa
 from ..dependencies import get_db, get_user
 from ..milvus_util import milvus
 from ..models import Question, QuestionSet
+from ..schemas import HTTPError
 
 router = APIRouter(
     prefix='/api/question',
     tags=['question'],
-    responses={404: {'description': 'Not found'}}
+    responses={401: {'model': HTTPError}, 403: {'model': HTTPError}}
 )
 
 
-@router.get('/{qid}', response_model=schemas.QuestionModel)
+@router.get('/{qid}', response_model=schemas.QuestionModel, responses={404: {'model': HTTPError}})
 def get_question(qid: int, db: Session = Depends(get_db)):
     question = db.query(Question).get(qid)
     if question:
         return question
     else:
-        raise HTTPException(status_code=404, detail='Question not found')
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')
 
 
-@router.put('/{qid}', response_model=schemas.QuestionModel)
+@router.put('/{qid}', response_model=schemas.QuestionModel, responses={404: {'model': HTTPError}})
 def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depends(get_db),
                     user_id: int = Depends(get_user)):
     title, content = args.title, args.content
@@ -43,10 +44,10 @@ def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depend
             milvus.delete(collection_name, [qid])
             milvus.insert(collection_name, [embedding], [qid])
         return question
-    raise HTTPException(status_code=404, detail='Question not found')
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')
 
 
-@router.delete('/{qid}')
+@router.delete('/{qid}', responses={404: {'model': HTTPError}})
 def delete_question(qid: int, db: Session = Depends(get_db)):
     question = db.query(Question).get(qid)
     if question:
@@ -56,7 +57,7 @@ def delete_question(qid: int, db: Session = Depends(get_db)):
         db.delete(question)
         db.commit()
         return {'ok': True}
-    raise HTTPException(status_code=404, detail='Question not found')
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')
 
 
 @router.get('/', response_model=List[schemas.QuestionModel])
@@ -64,7 +65,7 @@ def get_questions():
     return [{'username': 'Rick'}, {'username': 'Morty'}]
 
 
-@router.post('/', response_model=schemas.QuestionModel)
+@router.post('/', response_model=schemas.QuestionModel, status_code=status.HTTP_201_CREATED)
 def create_question(args: schemas.QuestionCreate, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     title, content = args.title, args.content
     embedding = json.dumps(rocketqa.get_para(title, content))  # dumps 只出现在了这里
