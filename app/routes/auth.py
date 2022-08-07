@@ -31,7 +31,7 @@ oauth.register(
 )
 
 
-@router.get('/login_id/{user_id}')
+@router.get('/login_id/{user_id}', description='测试用登录')
 async def login_id(request: Request, user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).get(user_id)
     if not user:

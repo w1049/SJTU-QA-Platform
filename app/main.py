@@ -37,7 +37,7 @@ def hello_world(request: Request):
     return templates.TemplateResponse('index.html', {'request': request})
 
 
-@app.post('/register')
+@app.post('/register', description='测试用注册')
 def register(name: str, institution: str | None = None, db: Session = Depends(get_db)):
     user = User(name=name, institution=institution)
     db.add(user)
@@ -50,7 +50,7 @@ def get_query(query: str, set_id: int | None = 1, db: Session = Depends(get_db))
     return _query(query, set_id, db)
 
 
-@app.get('/q/{query_str}')  # 给机器人用着玩玩的
+@app.get('/q/{query_str}', description='测试用，给机器人用着玩玩的')
 def q(query_str: str, db: Session = Depends(get_db)):
     ret = _query(query_str, 1, db)
     a = '<html><body><div>'
