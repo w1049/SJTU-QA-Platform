@@ -3,7 +3,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, Enum, ForeignKey, Integer, Table, String, PrimaryKeyConstraint, DateTime
 from sqlalchemy.dialects.postgresql import JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 
 from .database import Base
 
@@ -48,11 +48,13 @@ class Question(Base):
     embedding = Column(JSON, nullable=False)  # 好像实际上存的是 String?
     modified_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     modified_by_id = Column(Integer, ForeignKey('user.id'))
-    modified_by = relationship('User', backref='modified_question', uselist=False, foreign_keys=[modified_by_id])
+    modified_by = relationship('User', backref=backref('modified_question', lazy='dynamic'),
+                               uselist=False, foreign_keys=[modified_by_id])
     belongs = relationship('QuestionSet', secondary=set2question, back_populates='questions', lazy='dynamic')
     created_at = Column(DateTime, default=datetime.now)
     created_by_id = Column(Integer, ForeignKey('user.id'))
-    created_by = relationship('User', backref='created_question', uselist=False, foreign_keys=[created_by_id])
+    created_by = relationship('User', backref=backref('created_question', lazy='dynamic'),
+                              uselist=False, foreign_keys=[created_by_id])
 
 
 class QuestionSet(Base):
@@ -62,13 +64,16 @@ class QuestionSet(Base):
     name = Column(String(255), nullable=False)
     questions = relationship('Question', secondary=set2question, back_populates='belongs', lazy='dynamic')
     owner_id = Column(Integer, ForeignKey('user.id'))
-    owner = relationship('User', backref='own', uselist=False, foreign_keys=[owner_id])
-    maintainer = relationship('User', secondary=set2user, backref='maintain', lazy='dynamic')
+    owner = relationship('User', backref=backref('own', lazy='dynamic'),
+                         uselist=False, foreign_keys=[owner_id])
+    maintainer = relationship('User', secondary=set2user, backref=backref('maintain', lazy='dynamic'), lazy='dynamic')
     modified_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     modified_by_id = Column(Integer, ForeignKey('user.id'))
-    modified_by = relationship('User', backref='modified_set', uselist=False, foreign_keys=[modified_by_id])
+    modified_by = relationship('User', backref=backref('modified_set', lazy='dynamic'),
+                               uselist=False, foreign_keys=[modified_by_id])
     created_at = Column(DateTime, default=datetime.now)
     created_by_id = Column(Integer, ForeignKey('user.id'))
-    created_by = relationship('User', backref='created_set', uselist=False, foreign_keys=[created_by_id])
+    created_by = relationship('User', backref=backref('created_set', lazy='dynamic'),
+                              uselist=False, foreign_keys=[created_by_id])
     permission = Column(Enum(EnumPermission), server_default='private')
     # passwd

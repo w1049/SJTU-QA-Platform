@@ -33,6 +33,9 @@ class QuestionModel(BaseModel):
     class Config:
         orm_mode = True
 
+    def __hash__(self):
+        return self.id
+
 
 class QuestionSetModel(BaseModel):
     id: int

@@ -6,10 +6,10 @@ import click
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from .. import schemas
+from .. import schemas, guardian
 from ..dependencies import get_db, get_user
 from ..milvus_util import milvus
-from ..models import QuestionSet, Question
+from ..models import QuestionSet, Question, User, EnumRole
 from ..schemas import HTTPError
 
 router = APIRouter(
@@ -19,19 +19,11 @@ router = APIRouter(
 )
 
 
-def can_maintain(user_id, question_set):
-    if user_id == question_set.owner_id:
-        return True
-    # if user in question_set.maintainer:
-    #     return True
-    return False
-
-
 @router.get('/{sid}', response_model=schemas.QuestionSetRead, responses={404: {'model': HTTPError}})
 def get_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     question_set = db.query(QuestionSet).get(sid)
     if question_set:
-        if not can_maintain(user_id, question_set):
+        if not guardian.can_get_question_set(db.query(User).get(user_id), question_set):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
         ret_set = schemas.QuestionSetRead.from_orm(question_set)
         ret_set.question_ids = [qid[0] for qid in question_set.questions.with_entities(Question.id).all()]
@@ -50,7 +42,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
     if qs is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
 
-    if not can_maintain(user_id, qs):
+    if not guardian.can_modify_question_set(db.query(User).get(user_id), qs):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
 
     if op == 'append':
@@ -111,7 +103,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
 def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     question_set = db.query(QuestionSet).get(qid)
     if question_set:
-        if not can_maintain(user_id, question_set):
+        if not guardian.can_delete_question_set(db.query(User).get(user_id), question_set):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
         milvus.drop_collection('_' + str(question_set.id))
         db.delete(question_set)
@@ -122,19 +114,24 @@ def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = 
 
 @router.get('/', response_model=List[schemas.QuestionSetModel])
 def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
-    # if admin
-    return db.query(QuestionSet).all()
+    user = db.query(User).get(user_id)
+    if user.role == EnumRole.admin:
+        return db.query(QuestionSet).all()
+    return user.maintain.all()
 
 
 @router.post('/', response_model=schemas.QuestionSetModel, status_code=status.HTTP_201_CREATED)
 def create_question_set(args: schemas.QuestionSetCreate, db: Session = Depends(get_db),
                         user_id: int = Depends(get_user)):
     name = args.name
-
-    qs = QuestionSet(name=name)
-    qs.created_by_id = user_id
-    qs.owner_id = user_id
-    qs.modified_by_id = user_id
+    user = db.query(User).get(user_id)
+    if not guardian.can_create_question_set(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+    qs = QuestionSet(name=name,
+                     created_by=user,
+                     owner=user,
+                     modified_by=user)
+    qs.maintainer.append(user)
 
     db.add(qs)
     db.commit()

@@ -1,13 +1,13 @@
 import json
-from typing import List
+from typing import List, Set
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from .. import schemas, rocketqa
+from .. import schemas, rocketqa, guardian
 from ..dependencies import get_db, get_user
 from ..milvus_util import milvus
-from ..models import Question, QuestionSet
+from ..models import Question, QuestionSet, User, EnumRole
 from ..schemas import HTTPError
 
 router = APIRouter(
@@ -21,6 +21,8 @@ router = APIRouter(
 def get_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     question = db.query(Question).get(qid)
     if question:
+        if not guardian.can_get_question(db.query(User).get(user_id), question):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
         return question
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')
@@ -32,6 +34,8 @@ def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depend
     title, content = args.title, args.content
     question = db.query(Question).get(qid)
     if question:
+        if not guardian.can_modify_question(db.query(User).get(user_id), question):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
         embedding = rocketqa.get_para(title, content)
         question.title = title
         question.content = content
@@ -51,6 +55,8 @@ def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depend
 def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
     question = db.query(Question).get(qid)
     if question:
+        if not guardian.can_delete_question(db.query(User).get(user_id), question):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
         for sid in question.belongs.with_entities(QuestionSet.id).all():
             collection_name = '_' + str(sid[0])
             milvus.delete(collection_name, [qid])
@@ -60,13 +66,21 @@ def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depe
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')
 
 
-@router.get('/', response_model=List[schemas.QuestionModel])
+@router.get('/', response_model=Set[schemas.QuestionModel])
 def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
-    return db.query(Question).all()
+    user = db.query(User).get(user_id)
+    if user.role == EnumRole.admin:
+        return db.query(Question).all()
+    questions = user.created_question.all()
+    for qs in user.maintain.all():
+        questions.extend(qs.questions.all())
+    return questions
 
 
 @router.post('/', response_model=schemas.QuestionModel, status_code=status.HTTP_201_CREATED)
 def create_question(args: schemas.QuestionCreate, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+    if not guardian.can_create_question(db.query(User).get(user_id)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
     title, content = args.title, args.content
     embedding = json.dumps(rocketqa.get_para(title, content))  # dumps 只出现在了这里
     question = Question(title=title, content=content, embedding=embedding)
