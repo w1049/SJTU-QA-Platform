@@ -1,3 +1,5 @@
+from typing import Union
+
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from authlib.jose import jwt
 from authlib.oidc.core import CodeIDToken
@@ -49,7 +51,7 @@ async def login(request: Request):  # 禁止重复登录？
 
 
 @router.get('/auth')
-async def auth(request: Request, redirect_uri: str | None = None, db: Session = Depends(get_db)):
+async def auth(request: Request, redirect_uri: Union[str, None] = None, db: Session = Depends(get_db)):
     try:
         if redirect_uri:
             token = await oauth.jaccount.authorize_access_token(request, redirect_uri=redirect_uri)

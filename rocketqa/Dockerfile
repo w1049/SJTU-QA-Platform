@@ -1,9 +1,11 @@
 FROM python:slim
-
-COPY requirements.txt /tmp/requirements.txt
-RUN pip install --no-cache-dir -r /tmp/requirements.txt -i https://mirror.sjtu.edu.cn/pypi/web/simple && \
-pip install --no-cache-dir -r /tmp/requirements-1.txt -i https://mirror.sjtu.edu.cn/pypi/web/simple
-
+EXPOSE 25565
 WORKDIR /rocketqa
-COPY . .
+
+COPY requirements.txt requirements-1.txt ./
+RUN apt-get update && apt-get install libgomp1 && \
+pip install --no-cache-dir -r requirements.txt -i https://mirror.sjtu.edu.cn/pypi/web/simple && \
+pip install --no-cache-dir -r requirements-1.txt -i https://mirror.sjtu.edu.cn/pypi/web/simple
+
+COPY rocketqa_service.py .
 CMD ["python", "rocketqa_service.py"]

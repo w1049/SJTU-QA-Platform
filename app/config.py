@@ -1,11 +1,16 @@
-import os
+from pydantic import BaseSettings
 
-SECRET_KEY = os.getenv('SECRET_KEY')
-# JACCOUNT_CLIENT_ID = os.getenv('JACCOUNT_CLIENT_ID')
-# JACCOUNT_CLIENT_SECRET = os.getenv('JACCOUNT_CLIENT_SECRET')
 
-SQLALCHEMY_DATABASE_URI = "postgresql+psycopg2://admin:123456@192.168.124.4:5432/test"
+class Settings(BaseSettings):
+    secret_key: str
+    milvus_host: str
+    milvus_port: int
+    rocketqa_url: str
+    database_uri: str
 
-MILVUS_HOST = "192.168.124.4"
-MILVUS_PORT = "19530"
-ROCKETQA_URL = "http://127.0.0.1:25565/rocketqa"
+    class Config:
+        env_file = '.env'
+        env_file_encoding = 'utf-8'
+
+
+settings = Settings()

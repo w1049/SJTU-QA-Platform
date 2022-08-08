@@ -1,4 +1,5 @@
 import time
+from typing import Union
 
 import click
 from fastapi import FastAPI, Depends, Request
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import rocketqa
-from .config import SECRET_KEY
+from .config import settings
 from .dependencies import get_db
 from .milvus_util import milvus
 from .models import User, Question
@@ -20,7 +21,7 @@ app.include_router(question.router)
 app.include_router(question_set.router)
 app.include_router(auth.router)
 
-app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
+app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['http://localhost:5173'],
@@ -38,7 +39,7 @@ def hello_world(request: Request):
 
 
 @app.post('/register', description='测试用注册')
-def register(name: str, institution: str | None = None, db: Session = Depends(get_db)):
+def register(name: str, institution: Union[str, None] = None, db: Session = Depends(get_db)):
     user = User(name=name, institution=institution)
     db.add(user)
     db.commit()
@@ -46,7 +47,7 @@ def register(name: str, institution: str | None = None, db: Session = Depends(ge
 
 
 @app.get('/api/query')
-def get_query(query: str, set_id: int | None = 1, db: Session = Depends(get_db)):
+def get_query(query: str, set_id: Union[int, None] = 1, db: Session = Depends(get_db)):
     return _query(query, set_id, db)
 
 

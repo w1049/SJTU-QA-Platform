@@ -6,7 +6,7 @@ from .models import *
 
 
 @click.command()
-def db_init():
+def db_refresh():
     """删除并重新构建数据库"""
     click.echo('删除数据库和表')
     Base.metadata.drop_all(engine)
@@ -16,7 +16,12 @@ def db_init():
 
 
 @click.command()
-def milvus_init():
+def db_init():
+    Base.metadata.create_all(engine)
+
+
+@click.command()
+def milvus_refresh():
     status, collections = milvus.client.list_collections()
     for collection in collections:
         milvus.client.drop_collection(collection)
@@ -28,7 +33,8 @@ def group():
 
 
 group.add_command(db_init)
-group.add_command(milvus_init)
+group.add_command(db_refresh)
+group.add_command(milvus_refresh)
 
 if __name__ == '__main__':
     group()

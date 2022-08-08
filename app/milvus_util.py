@@ -1,12 +1,12 @@
 from milvus import Milvus, IndexType, MetricType
 
-from .config import MILVUS_HOST, MILVUS_PORT
+from .config import settings
 
 
 # 暂时用Milvus, 还没测PgVector（postgresql的插件）
 class MilvusUtil:
     def __init__(self):
-        self.client = Milvus(host=MILVUS_HOST, port=MILVUS_PORT)
+        self.client = Milvus(host=settings.milvus_host, port=settings.milvus_port)
 
     def has_collection(self, name):
         try:
