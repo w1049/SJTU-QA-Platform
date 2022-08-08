@@ -6,8 +6,9 @@ from sqlalchemy.orm import Session
 from starlette.config import Config
 from starlette.responses import RedirectResponse
 
-from ..dependencies import get_db
+from ..dependencies import get_db, get_user
 from ..models import User
+from ..schemas import HTTPError, UserModel
 
 router = APIRouter(
     prefix='/api',
@@ -67,6 +68,11 @@ async def auth(request: Request, redirect_uri: str | None = None, db: Session = 
         db.refresh(user)
     request.session['user_id'] = user.id
     return {'account': account}
+
+
+@router.get('/me', response_model=UserModel, responses={401: {'model': HTTPError}})
+def me(user_id: int = Depends(get_user), db: Session = Depends(get_db)):
+    return db.query(User).get(user_id)
 
 
 @router.get('/logout')
