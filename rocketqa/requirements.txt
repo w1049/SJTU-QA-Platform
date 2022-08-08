@@ -1,0 +1,8 @@
+tornado==6.2
+common==0.1.2
+dual==0.0.10
+tight==0.1.0
+data==0.4
+prox==0.0.17
+numpy==1.23.1
+scipy==1.9.0
