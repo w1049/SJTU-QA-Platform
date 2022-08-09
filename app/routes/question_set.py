@@ -55,11 +55,12 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         try:
             db.commit()
         except Exception as e:
-            db.rollback()
+            db.rollback()  # 或许不需要显式rollback
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='不要重复插入问题')
 
         embeddings = [json.loads(question.embedding) for question in questions]
-
+        qids = [question.id for question in questions]
+        
         end = time.time()
         click.echo('sql time: {}s'.format(end - start))
 
