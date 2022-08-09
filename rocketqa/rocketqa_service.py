@@ -4,8 +4,7 @@ import json
 import time
 
 import rocketqa
-from tornado import ioloop
-from tornado import web
+from tornado import ioloop, web, httpserver
 
 
 class RocketQAServer(web.RequestHandler):
@@ -70,5 +69,7 @@ if __name__ == "__main__":
     sub_address = r'/rocketqa'
     port = 25565
     app = create_rocketqa_app(sub_address, RocketQAServer)
-    app.listen(port)
+    server = httpserver.HTTPServer(app)
+    server.bind(port)
+    server.start(0)
     ioloop.IOLoop.current().start()

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from .. import schemas, rocketqa, guardian
+from ..database import SessionLocal
 from ..dependencies import get_db, get_user
 from ..milvus_util import milvus
 from ..models import Question, QuestionSet, User, EnumRole
@@ -78,15 +79,18 @@ def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_user
 
 
 @router.post('/', response_model=schemas.QuestionModel, status_code=status.HTTP_201_CREATED)
-def create_question(args: schemas.QuestionCreate, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
-    if not guardian.can_create_question(db.query(User).get(user_id)):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+async def create_question(args: schemas.QuestionCreate, user_id: int = Depends(get_user)):
+    with SessionLocal() as db:
+        if not guardian.can_create_question(db.query(User).get(user_id)):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
     title, content = args.title, args.content
-    embedding = json.dumps(rocketqa.get_para(title, content))  # dumps 只出现在了这里
-    question = Question(title=title, content=content, embedding=embedding)
-    question.created_by_id = user_id
-    question.modified_by_id = user_id
-    db.add(question)
-    db.commit()
-    db.refresh(question)
-    return question
+    emb_array = await rocketqa.async_get_para(title, content)
+    embedding = json.dumps(emb_array)  # dumps 只出现在了这里
+    with SessionLocal() as db:
+        question = Question(title=title, content=content, embedding=embedding)
+        question.created_by_id = user_id
+        question.modified_by_id = user_id
+        db.add(question)
+        db.commit()
+        db.refresh(question)
+        return question
