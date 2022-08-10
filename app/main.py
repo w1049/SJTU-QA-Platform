@@ -1,7 +1,10 @@
+import os
 import time
+from datetime import datetime
 from typing import Union
 
 import click
+from loguru import logger
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
@@ -10,12 +13,19 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import rocketqa
 from .config import settings
+from .database import Base, engine
 from .dependencies import get_db
 from .milvus_util import milvus
 from .models import User, Question
 from .routes import question, question_set, auth
 
 app = FastAPI()
+
+log_path = 'logs'
+if not os.path.exists(log_path):
+    os.mkdir(log_path)
+log_file = '{0}/{1}.log'.format(log_path, datetime.now().strftime('%Y-%m-%d'))
+logger.add(log_file, rotation='0:00', encoding='utf-8', retention='3 days', enqueue=True, serialize=False)
 
 app.include_router(question.router)
 app.include_router(question_set.router)
@@ -31,6 +41,17 @@ app.add_middleware(
 )
 
 templates = Jinja2Templates(directory='templates')
+
+
+@app.on_event("startup")
+def startup_event():
+    Base.metadata.create_all(engine)
+    logger.info('Server starting...')
+
+
+@app.on_event("shutdown")
+def shutdown_event():
+    logger.info('Server shutdown.')
 
 
 @app.get('/')
@@ -68,11 +89,9 @@ def _query(query_str, set_id, db):
         set_id = 1
     embedding = rocketqa.get_embedding(query_str)
     end = time.time()
-    click.echo('feature extract time: {}s'.format(end - start))
+    logger.debug('feature extract time: {}s', end - start)
 
     start = time.time()
-    # name = '_' + str(set_id)
-    # click.echo(name)
 
     name = '_' + str(set_id)
     status, search_result = milvus.search(name, embedding, 5)
@@ -82,7 +101,7 @@ def _query(query_str, set_id, db):
     for each_distance in search_result[0]:
         qids.append(each_distance.id)
     end = time.time()
-    click.echo('search time: {}s'.format(end - start))
+    logger.debug('search time: {}s', end - start)
 
     start = time.time()
     output = []
@@ -90,5 +109,5 @@ def _query(query_str, set_id, db):
         question = db.query(Question).get(qid)
         output.append({'title': question.title, 'content': question.content})
     end = time.time()
-    click.echo('sql time: {}s'.format(end - start))
+    logger.debug('sql time: {}s', end - start)
     return output

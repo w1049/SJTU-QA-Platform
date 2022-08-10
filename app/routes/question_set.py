@@ -2,8 +2,8 @@ import json
 import time
 from typing import List
 
-import click
 from fastapi import APIRouter, Depends, HTTPException, status
+from loguru import logger
 from sqlalchemy.orm import Session
 
 from .. import schemas, guardian
@@ -62,11 +62,11 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         qids = [question.id for question in questions]
         
         end = time.time()
-        click.echo('sql time: {}s'.format(end - start))
+        logger.debug('sql time: {}s', end - start)
 
         milvus.insert('_' + str(sid), embeddings, qids)
         end2 = time.time()
-        click.echo('milvus time: {}s'.format(end2 - end))
+        logger.debug('milvus time: {}s', end2 - end)
         return {'message': '问题库增加问题'}
 
     elif op == 'remove':
@@ -80,7 +80,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             db.commit()
         except Exception as e:
             db.rollback()
-            print(e)
+            logger.debug(e)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='未插入的问题')
 
         milvus.delete('_' + str(sid), qids)
