@@ -1,9 +1,7 @@
 import os
 import time
-from datetime import datetime
 from typing import Union
 
-import click
 from loguru import logger
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,7 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 from . import rocketqa
-from .config import settings
+from .config import settings, setup_logging
 from .database import Base, engine
 from .dependencies import get_db
 from .milvus_util import milvus
@@ -20,12 +18,6 @@ from .models import User, Question
 from .routes import question, question_set, auth
 
 app = FastAPI()
-
-log_path = 'logs'
-if not os.path.exists(log_path):
-    os.mkdir(log_path)
-log_file = '{0}/{1}.log'.format(log_path, datetime.now().strftime('%Y-%m-%d'))
-logger.add(log_file, rotation='0:00', encoding='utf-8', retention='3 days', enqueue=True, serialize=False)
 
 app.include_router(question.router)
 app.include_router(question_set.router)
@@ -45,13 +37,14 @@ templates = Jinja2Templates(directory='templates')
 
 @app.on_event("startup")
 def startup_event():
+    setup_logging()
     Base.metadata.create_all(engine)
-    logger.info('Server starting...')
+    logger.info('Server [{}] starting...', os.getpid())
 
 
 @app.on_event("shutdown")
 def shutdown_event():
-    logger.info('Server shutdown.')
+    logger.info('Server [{}] shutdown.', os.getpid())
 
 
 @app.get('/')
