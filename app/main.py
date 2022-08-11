@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Union
+from typing import Optional
 
 from loguru import logger
 from fastapi import FastAPI, Depends, Request
@@ -53,7 +53,7 @@ def hello_world(request: Request):
 
 
 @app.post('/register', description='测试用注册')
-def register(name: str, institution: Union[str, None] = None, db: Session = Depends(get_db)):
+def register(name: str, institution: Optional[str] = None, db: Session = Depends(get_db)):
     user = User(name=name, institution=institution)
     db.add(user)
     db.commit()
@@ -61,7 +61,7 @@ def register(name: str, institution: Union[str, None] = None, db: Session = Depe
 
 
 @app.get('/api/query')
-def get_query(query: str, set_id: Union[int, None] = 1, db: Session = Depends(get_db)):
+def get_query(query: str, set_id: Optional[int] = 1, db: Session = Depends(get_db)):
     return _query(query, set_id, db)
 
 
