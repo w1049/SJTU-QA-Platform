@@ -50,6 +50,8 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID不能为空')
         start = time.time()
         questions = db.query(Question).filter(Question.id.in_(qids)).all()
+        if len(qids) != len(questions):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID有错误')
         qs.questions.extend(questions)
         qs.modified_by_id = user_id
         try:
@@ -73,6 +75,8 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         if not qids:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID不能为空')
         questions = db.query(Question).filter(Question.id.in_(qids)).all()
+        if len(qids) != len(questions):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID有错误')
         for question in questions:
             qs.questions.remove(question)
         qs.modified_by_id = user_id
