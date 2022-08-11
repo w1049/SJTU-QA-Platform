@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from .. import schemas, rocketqa, guardian
 from ..database import SessionLocal
-from ..dependencies import get_db, get_user
+from ..dependencies import get_db, get_logged_user
 from ..milvus_util import milvus
 from ..models import Question, QuestionSet, User, EnumRole
 from ..schemas import HTTPError
@@ -19,7 +19,7 @@ router = APIRouter(
 
 
 @router.get('/{qid}', response_model=schemas.QuestionModel, responses={404: {'model': HTTPError}})
-def get_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+def get_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     question = db.query(Question).get(qid)
     if question:
         if not guardian.can_get_question(db.query(User).get(user_id), question):
@@ -31,7 +31,7 @@ def get_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends
 
 @router.put('/{qid}', response_model=schemas.QuestionModel, responses={404: {'model': HTTPError}})
 def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depends(get_db),
-                    user_id: int = Depends(get_user)):
+                    user_id: int = Depends(get_logged_user)):
     title, content = args.title, args.content
     question = db.query(Question).get(qid)
     if question:
@@ -53,7 +53,7 @@ def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depend
 
 
 @router.delete('/{qid}', responses={404: {'model': HTTPError}})
-def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     question = db.query(Question).get(qid)
     if question:
         if not guardian.can_delete_question(db.query(User).get(user_id), question):
@@ -68,7 +68,7 @@ def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depe
 
 
 @router.get('/', response_model=Set[schemas.QuestionModel])
-def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
     if user.role == EnumRole.admin:
         return db.query(Question).all()
@@ -79,7 +79,7 @@ def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_user
 
 
 @router.post('/', response_model=schemas.QuestionModel, status_code=status.HTTP_201_CREATED)
-async def create_question(args: schemas.QuestionCreate, user_id: int = Depends(get_user)):
+async def create_question(args: schemas.QuestionCreate, user_id: int = Depends(get_logged_user)):
     with SessionLocal() as db:
         if not guardian.can_create_question(db.query(User).get(user_id)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')

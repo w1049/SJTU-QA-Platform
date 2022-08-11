@@ -3,7 +3,7 @@ import time
 from typing import Optional
 
 from loguru import logger
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -11,10 +11,11 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from . import rocketqa
 from .config import settings, setup_logging
-from .database import Base, engine
-from .dependencies import get_db
+from .database import Base, engine, SessionLocal
+from .dependencies import get_db, get_user
+from .guardian import can_get_question_set
 from .milvus_util import milvus
-from .models import User, Question
+from .models import User, Question, QuestionSet, EnumPermission, EnumRole
 from .routes import question, question_set, auth
 
 app = FastAPI()
@@ -40,6 +41,23 @@ def startup_event():
     setup_logging()
     Base.metadata.create_all(engine)
     logger.info('Server [{}] starting...', os.getpid())
+    with SessionLocal() as db:
+        qs = db.query(QuestionSet).with_for_update().get(1)
+        if not qs:
+            user = User(name='system', institution='system', role=EnumRole.admin)
+            db.add(user)
+            db.flush()
+            qs = QuestionSet(name='公开库', permission=EnumPermission.public,
+                             created_by=user,
+                             owner=user,
+                             maintainer=[user],
+                             modified_by=user)
+            db.add(qs)
+            milvus.create_collection('_1')
+            db.commit()
+            logger.info('PublicSet Created.')
+        else:
+            logger.info('PublicSet Exists.')
 
 
 @app.on_event("shutdown")
@@ -61,8 +79,9 @@ def register(name: str, institution: Optional[str] = None, db: Session = Depends
 
 
 @app.get('/api/query')
-def get_query(query: str, set_id: Optional[int] = 1, db: Session = Depends(get_db)):
-    return _query(query, set_id, db)
+def get_query(query: str, set_id: Optional[int] = 1, db: Session = Depends(get_db),
+              user_id: Optional[int] = Depends(get_user)):
+    return _query(query, set_id, db, user_id)
 
 
 @app.get('/q/{query_str}', description='测试用，给机器人用着玩玩的')
@@ -76,10 +95,14 @@ def q(query_str: str, db: Session = Depends(get_db)):
     return a
 
 
-def _query(query_str, set_id, db):
+def _query(query_str: str, set_id: int, db: Session, user_id: Optional[int]):
+    question_set = db.query(QuestionSet).get(set_id)
+    if not can_get_question_set(db.query(User).get(user_id), question_set):
+        if user_id is None:
+            raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail="Please login")
+        else:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
     start = time.time()
-    if set_id is None:
-        set_id = 1
     embedding = rocketqa.get_embedding(query_str)
     end = time.time()
     logger.debug('feature extract time: {}s', end - start)
@@ -87,7 +110,7 @@ def _query(query_str, set_id, db):
     start = time.time()
 
     name = '_' + str(set_id)
-    status, search_result = milvus.search(name, embedding, 5)
+    search_status, search_result = milvus.search(name, embedding, 5)
     qids = []
     if not search_result:
         return {'message': "I'm a teapot"}, 418

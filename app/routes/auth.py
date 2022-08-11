@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from starlette.config import Config
 from starlette.responses import RedirectResponse
 
-from ..dependencies import get_db, get_user
+from ..dependencies import get_db, get_logged_user
 from ..models import User
 from ..schemas import HTTPError, UserModel
 
@@ -63,7 +63,7 @@ async def auth(request: Request, redirect_uri: Optional[str] = None, db: Session
                         oauth.jaccount.client_secret, claims_cls=CodeIDToken)
     account = claims['sub']
     name = account
-    user = db.query(User).filter_by(name=name).first()
+    user = db.query(User).filter_by(name=name).with_for_update().first()
     if not user:
         user = User(name=name)
         db.commit()
@@ -73,7 +73,7 @@ async def auth(request: Request, redirect_uri: Optional[str] = None, db: Session
 
 
 @router.get('/me', response_model=UserModel, responses={401: {'model': HTTPError}})
-def me(user_id: int = Depends(get_user), db: Session = Depends(get_db)):
+def me(user_id: int = Depends(get_logged_user), db: Session = Depends(get_db)):
     return db.query(User).get(user_id)
 
 

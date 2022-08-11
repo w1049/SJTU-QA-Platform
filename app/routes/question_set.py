@@ -7,9 +7,9 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from .. import schemas, guardian
-from ..dependencies import get_db, get_user
+from ..dependencies import get_db, get_logged_user
 from ..milvus_util import milvus
-from ..models import QuestionSet, Question, User, EnumRole
+from ..models import QuestionSet, Question, User, EnumRole, EnumPermission
 from ..schemas import HTTPError
 
 router = APIRouter(
@@ -20,7 +20,7 @@ router = APIRouter(
 
 
 @router.get('/{sid}', response_model=schemas.QuestionSetRead, responses={404: {'model': HTTPError}})
-def get_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+def get_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     question_set = db.query(QuestionSet).get(sid)
     if question_set:
         if not guardian.can_get_question_set(db.query(User).get(user_id), question_set):
@@ -33,7 +33,7 @@ def get_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Dep
 
 @router.put('/{sid}', responses={404: {'model': HTTPError}, 400: {'model': HTTPError}})
 def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session = Depends(get_db),
-                        user_id: int = Depends(get_user)):
+                        user_id: int = Depends(get_logged_user)):
     op = args.operation
     name = args.name
     qids = args.question_ids
@@ -45,6 +45,10 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
     if not guardian.can_modify_question_set(db.query(User).get(user_id), qs):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
 
+    public = False
+    if qs.permission == EnumPermission.public:
+        public = True
+
     if op == 'append':
         if not qids:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID不能为空')
@@ -54,6 +58,9 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID有错误')
         qs.questions.extend(questions)
         qs.modified_by_id = user_id
+        if public:
+            public_set = db.query(QuestionSet).get(1)
+            public_set.questions.extend(questions)
         try:
             db.commit()
         except Exception as e:
@@ -67,6 +74,9 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         logger.debug('sql time: {}s', end - start)
 
         milvus.insert('_' + str(sid), embeddings, qids)
+        if public:
+            milvus.insert('_1', embeddings, qids)
+
         end2 = time.time()
         logger.debug('milvus time: {}s', end2 - end)
         return {'message': '问题库增加问题'}
@@ -80,6 +90,10 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         for question in questions:
             qs.questions.remove(question)
         qs.modified_by_id = user_id
+        if public:
+            public_set = db.query(QuestionSet).get(1)
+            for question in questions:
+                public_set.questions.remove(question)
         try:
             db.commit()
         except Exception as e:
@@ -88,6 +102,8 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='未插入的问题')
 
         milvus.delete('_' + str(sid), qids)
+        if public:
+            milvus.delete('_1', qids)
         return {'message': '问题库移除问题'}
 
     elif op == 'rename':
@@ -98,6 +114,34 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         db.commit()
         return {'message': '问题库更名'}
 
+    elif op == 'public':
+        if qs.permission != EnumPermission.public:
+            qs.permission = EnumPermission.public
+            qs.modified_by_id = user_id
+            public_set = db.query(QuestionSet).get(1)
+            questions = qs.questions
+            public_set.questions.extend(questions)
+            db.commit()
+
+            embeddings = [json.loads(question.embedding) for question in questions]
+            qids = [question.id for question in questions]
+            milvus.insert('_1', embeddings, qids)
+            return {'message': '设为公开'}
+
+    elif op == 'private':
+        if qs.permission != EnumPermission.private:
+            qs.permission = EnumPermission.private
+            qs.modified_by_id = user_id
+            public_set = db.query(QuestionSet).get(1)
+            questions = qs.questions
+            for question in questions:
+                public_set.questions.remove(question)
+            db.commit()
+
+            qids = [question.id for question in questions]
+            milvus.delete('_1', qids)
+            return {'message': '设为私有'}
+
     # add maintainer
     # change owner
 
@@ -105,7 +149,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
 
 
 @router.delete('/{sid}', responses={404: {'model': HTTPError}})
-def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     question_set = db.query(QuestionSet).get(qid)
     if question_set:
         if not guardian.can_delete_question_set(db.query(User).get(user_id), question_set):
@@ -118,8 +162,10 @@ def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = 
 
 
 @router.get('/', response_model=List[schemas.QuestionSetModel])
-def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_user)):
+def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
+    if not user:
+        return []  # return public
     if user.role == EnumRole.admin:
         return db.query(QuestionSet).all()
     return user.maintain.all()
@@ -127,7 +173,7 @@ def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_
 
 @router.post('/', response_model=schemas.QuestionSetModel, status_code=status.HTTP_201_CREATED)
 def create_question_set(args: schemas.QuestionSetCreate, db: Session = Depends(get_db),
-                        user_id: int = Depends(get_user)):
+                        user_id: int = Depends(get_logged_user)):
     name = args.name
     user = db.query(User).get(user_id)
     if not guardian.can_create_question_set(user):
