@@ -1,13 +1,14 @@
 import json
-from typing import List, Set
+from typing import Set, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from .. import schemas, rocketqa, guardian
+from .. import schemas, guardian
+from ..utils import rocketqa
 from ..database import SessionLocal
 from ..dependencies import get_db, get_logged_user
-from ..milvus_util import milvus
+from ..utils.milvus_util import milvus
 from ..models import Question, QuestionSet, User, EnumRole
 from ..schemas import HTTPError
 
@@ -67,14 +68,27 @@ def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depe
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')
 
 
-@router.get('/', response_model=Set[schemas.QuestionModel])
-def get_questions(db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
+@router.get('/', response_model=schemas.QuestionListPage, responses={404: {'model': HTTPError}},
+            description='无sid: 返回用户创建的问题（admin可获取所有问题）\n\n'
+                        '有sid: 返回问题库内的问题')
+def get_questions(sid: Optional[int] = None, pager: schemas.Pager = Depends(),
+                  db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
-    if user.role == EnumRole.admin:
-        return db.query(Question).all()
-    questions = user.created_question.all()
-    for qs in user.maintain.all():
-        questions.extend(qs.questions.all())
+    if sid is None:
+        if user.role == EnumRole.admin:
+            query = db.query(Question)
+        else:
+            query = user.created_question
+    else:
+        question_set = db.query(QuestionSet).get(sid)
+        if question_set:
+            if not guardian.can_get_question_set(db.query(User).get(user_id), question_set):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+            query = question_set.questions
+        else:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
+    questions = schemas.QuestionListPage()
+    query.paginate(pager.page, pager.per_page).update(questions)
     return questions
 
 

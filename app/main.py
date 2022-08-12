@@ -9,13 +9,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from . import rocketqa
+from .utils import rocketqa
 from .config import settings, setup_logging
-from .database import Base, engine, SessionLocal
 from .dependencies import get_db, get_user
 from .guardian import can_get_question_set
-from .milvus_util import milvus
-from .models import User, Question, QuestionSet, EnumPermission, EnumRole
+from .utils.milvus_util import milvus
+from .models import User, Question, QuestionSet
 from .routes import question, question_set, auth
 
 app = FastAPI()

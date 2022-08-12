@@ -1,14 +1,14 @@
 import json
 import time
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from loguru import logger
 from sqlalchemy.orm import Session
 
 from .. import schemas, guardian
 from ..dependencies import get_db, get_logged_user
-from ..milvus_util import milvus
+from ..utils.milvus_util import milvus
 from ..models import QuestionSet, Question, User, EnumRole, EnumPermission
 from ..schemas import HTTPError
 
@@ -69,7 +69,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
 
         embeddings = [json.loads(question.embedding) for question in questions]
         qids = [question.id for question in questions]
-        
+
         end = time.time()
         logger.debug('sql time: {}s', end - start)
 

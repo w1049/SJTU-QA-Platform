@@ -1,7 +1,7 @@
 from loguru import logger
 from milvus import Milvus, IndexType, MetricType
 
-from .config import settings
+from ..config import settings
 
 
 # 暂时用Milvus, 还没测PgVector（postgresql的插件）

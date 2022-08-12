@@ -6,7 +6,7 @@ from datetime import datetime
 from loguru import logger
 from pydantic import BaseSettings
 
-from .logging import InterceptHandler
+from .utils.logging import InterceptHandler
 
 
 class Settings(BaseSettings):

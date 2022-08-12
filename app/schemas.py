@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import List, Optional
 
+from fastapi import Query
 from pydantic import BaseModel
 
 from .models import EnumRole, EnumPermission
@@ -57,6 +58,33 @@ class QuestionSetModel(BaseModel):
         orm_mode = True
 
 
+class UserA(BaseModel):
+    name: str
+
+    class Config:
+        orm_mode = True
+
+
+class QuestionA(BaseModel):
+    id: int
+    title: str
+    modified_at: datetime
+    modified_by: UserA
+    created_at: datetime
+    created_by: UserA
+
+    class Config:
+        orm_mode = True
+
+
+class QuestionListPage(BaseModel):
+    page: int = 1
+    per_page: int = 10
+    total: int = 0
+    pages: int = 1
+    items: List[QuestionA] = []
+
+
 class QuestionSetRead(QuestionSetModel):
     question_ids: List[int] = []
 
@@ -88,3 +116,8 @@ class HTTPError(BaseModel):
         schema_extra = {
             'example': {'detail': 'HTTPException raised.'}
         }
+
+
+class Pager(BaseModel):
+    page: int = Query(default=1, ge=1)
+    per_page: Optional[int] = Query(default=10, ge=1)
