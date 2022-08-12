@@ -35,29 +35,12 @@ app.add_middleware(
 
 templates = Jinja2Templates(directory='templates')
 
+setup_logging()
+
 
 @app.on_event("startup")
 def startup_event():
-    setup_logging()
-    Base.metadata.create_all(engine)
     logger.info('Server [{}] starting...', os.getpid())
-    with SessionLocal() as db:
-        qs = db.query(QuestionSet).with_for_update().get(1)
-        if not qs:
-            user = User(name='system', institution='system', role=EnumRole.admin)
-            db.add(user)
-            db.flush()
-            qs = QuestionSet(name='公开库', permission=EnumPermission.public,
-                             created_by=user,
-                             owner=user,
-                             maintainer=[user],
-                             modified_by=user)
-            db.add(qs)
-            milvus.create_collection('_1')
-            db.commit()
-            logger.info('PublicSet Created.')
-        else:
-            logger.info('PublicSet Exists.')
 
 
 @app.on_event("shutdown")
