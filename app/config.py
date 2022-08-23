@@ -11,6 +11,8 @@ from .utils.logging import InterceptHandler
 
 class Settings(BaseSettings):
     secret_key: str
+    jaccount_client_id: str
+    jaccount_client_secret: str
     milvus_host: str
     milvus_port: int
     rocketqa_url: str

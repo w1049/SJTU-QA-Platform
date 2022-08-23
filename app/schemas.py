@@ -10,7 +10,7 @@ from .models import EnumRole, EnumPermission
 class UserModel(BaseModel):
     id: int
     name: str
-    institution: str
+    institution: Optional[str]
     role: EnumRole
 
     class Config:

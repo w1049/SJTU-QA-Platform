@@ -4,10 +4,12 @@ from authlib.integrations.starlette_client import OAuth, OAuthError
 from authlib.jose import jwt
 from authlib.oidc.core import CodeIDToken
 from fastapi import Request, APIRouter, Depends, HTTPException
+from loguru import logger
 from sqlalchemy.orm import Session
 from starlette.config import Config
 from starlette.responses import RedirectResponse
 
+from ..config import settings
 from ..dependencies import get_db, get_logged_user
 from ..models import User
 from ..schemas import HTTPError, UserModel
@@ -18,16 +20,17 @@ router = APIRouter(
     responses={404: {'description': 'Not found'}}
 )
 
-config = Config('.env')
-oauth = OAuth(config)
+oauth = OAuth()
 
 oauth.register(
     name='jaccount',
+    client_id=settings.jaccount_client_id,
+    client_secret=settings.jaccount_client_secret,
     access_token_url='https://jaccount.sjtu.edu.cn/oauth2/token',
     authorize_url='https://jaccount.sjtu.edu.cn/oauth2/authorize',
     api_base_url='https://api.sjtu.edu.cn/',
     client_kwargs={
-        'scope': 'openid',
+        'scope': 'basic',
         'token_endpoint_auth_method': 'client_secret_basic',
         'token_placement': 'header'
     }
@@ -66,8 +69,9 @@ async def auth(request: Request, redirect_uri: Optional[str] = None, db: Session
     user = db.query(User).filter_by(name=name).with_for_update().first()
     if not user:
         user = User(name=name)
+        db.add(user)
         db.commit()
-        db.refresh(user)
+        logger.info('New user: {}', user)
     request.session['user_id'] = user.id
     return {'account': account}
 
