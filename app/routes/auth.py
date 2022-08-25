@@ -44,7 +44,7 @@ async def login_id(request: Request, user_id: int, db: Session = Depends(get_db)
 
 
 @router.get('/login')
-async def login(request: Request, redirect_uri: Optional[str]):  # 禁止重复登录？
+async def login(request: Request, redirect_uri: Optional[str] = None):  # 禁止重复登录？
     if not redirect_uri:
         redirect_uri = request.url_for('auth')
     return await oauth.jaccount.authorize_redirect(request, redirect_uri)

@@ -78,7 +78,7 @@ def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depe
 @router.get('/', response_model=schemas.QuestionListPage, responses={404: {'model': HTTPError}},
             description='无sid: 返回用户创建的问题（admin可获取所有问题）\n\n'
                         '有sid: 返回问题库内的问题')
-def get_questions(sid: Optional[int], pager: schemas.Pager = Depends(),
+def get_questions(sid: Optional[int] = None, pager: schemas.Pager = Depends(),
                   db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
     if sid is None:
