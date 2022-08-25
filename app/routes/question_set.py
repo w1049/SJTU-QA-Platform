@@ -149,8 +149,8 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
 
 
 @router.delete('/{sid}', responses={404: {'model': HTTPError}})
-def delete_question_set(qid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
-    question_set = db.query(QuestionSet).get(qid)
+def delete_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
+    question_set = db.query(QuestionSet).get(sid)
     if question_set:
         if not guardian.can_delete_question_set(db.query(User).get(user_id), question_set):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
