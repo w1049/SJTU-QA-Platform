@@ -29,11 +29,7 @@ oauth.register(
     access_token_url='https://jaccount.sjtu.edu.cn/oauth2/token',
     authorize_url='https://jaccount.sjtu.edu.cn/oauth2/authorize',
     api_base_url='https://api.sjtu.edu.cn/',
-    client_kwargs={
-        'scope': 'basic',
-        'token_endpoint_auth_method': 'client_secret_basic',
-        'token_placement': 'header'
-    }
+    client_kwargs={'scope': 'basic'}
 )
 
 
@@ -48,18 +44,16 @@ async def login_id(request: Request, user_id: int, db: Session = Depends(get_db)
 
 
 @router.get('/login')
-async def login(request: Request):  # 禁止重复登录？
-    redirect_uri = request.url_for('auth')
+async def login(request: Request, redirect_uri: Optional[str]):  # 禁止重复登录？
+    if not redirect_uri:
+        redirect_uri = request.url_for('auth')
     return await oauth.jaccount.authorize_redirect(request, redirect_uri)
 
 
 @router.get('/auth')
-async def auth(request: Request, redirect_uri: Optional[str] = None, db: Session = Depends(get_db)):
+async def auth(request: Request, db: Session = Depends(get_db)):
     try:
-        if redirect_uri:
-            token = await oauth.jaccount.authorize_access_token(request, redirect_uri=redirect_uri)
-        else:
-            token = await oauth.jaccount.authorize_access_token(request)
+        token = await oauth.jaccount.authorize_access_token(request)
     except OAuthError:
         raise HTTPException(status_code=400, detail='Bad Arguments')
     claims = jwt.decode(token.get('id_token'),
