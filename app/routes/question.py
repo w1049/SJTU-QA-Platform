@@ -33,14 +33,21 @@ def get_question(qid: int, db: Session = Depends(get_db), user_id: int = Depends
 @router.put('/{qid}', response_model=schemas.QuestionModel, responses={404: {'model': HTTPError}})
 def update_question(qid: int, args: schemas.QuestionUpdate, db: Session = Depends(get_db),
                     user_id: int = Depends(get_logged_user)):
-    title, content = args.title, args.content
     question = db.query(Question).get(qid)
     if question:
         if not guardian.can_modify_question(db.query(User).get(user_id), question):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+        if args.title:
+            question.title = args.title
+            title = args.title
+        else:
+            title = question.title
+        if args.content:
+            question.content = args.content
+            content = args.content
+        else:
+            content = question.content
         embedding = rocketqa.get_para(title, content)
-        question.title = title
-        question.content = content
         question.embedding = json.dumps(embedding)
         question.modified_by_id = user_id
         db.commit()
@@ -71,7 +78,7 @@ def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depe
 @router.get('/', response_model=schemas.QuestionListPage, responses={404: {'model': HTTPError}},
             description='无sid: 返回用户创建的问题（admin可获取所有问题）\n\n'
                         '有sid: 返回问题库内的问题')
-def get_questions(sid: Optional[int] = None, pager: schemas.Pager = Depends(),
+def get_questions(sid: Optional[int], pager: schemas.Pager = Depends(),
                   db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
     if sid is None:

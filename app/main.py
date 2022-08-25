@@ -61,7 +61,7 @@ def register(name: str, institution: Optional[str] = None, db: Session = Depends
 
 
 @app.get('/api/query')
-def get_query(query: str, set_id: Optional[int] = 1, db: Session = Depends(get_db),
+def get_query(query: str, set_id: int = 1, db: Session = Depends(get_db),
               user_id: Optional[int] = Depends(get_user)):
     return _query(query, set_id, db, user_id)
 
@@ -77,7 +77,7 @@ def q(query_str: str, db: Session = Depends(get_db)):
     return a
 
 
-def _query(query_str: str, set_id: int, db: Session, user_id: Optional[int]):
+def _query(query_str: str, set_id: int, db: Session, user_id: Optional[int] = None):
     question_set = db.query(QuestionSet).get(set_id)
     if not can_get_question_set(db.query(User).get(user_id), question_set):
         if user_id is None:

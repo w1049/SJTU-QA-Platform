@@ -95,8 +95,8 @@ class QuestionCreate(BaseModel):
 
 
 class QuestionUpdate(BaseModel):
-    title: str
-    content: str
+    title: Optional[str]
+    content: Optional[str]
 
 
 class QuestionSetCreate(BaseModel):
@@ -104,9 +104,10 @@ class QuestionSetCreate(BaseModel):
 
 
 class QuestionSetUpdate(BaseModel):
-    operation: str
     name: Optional[str]
-    question_ids: Optional[List[int]]
+    append_qids: Optional[List[int]]
+    remove_qids: Optional[List[int]]
+    permission: Optional[str]
 
 
 class HTTPError(BaseModel):
@@ -120,4 +121,4 @@ class HTTPError(BaseModel):
 
 class Pager(BaseModel):
     page: int = Query(default=1, ge=1)
-    per_page: Optional[int] = Query(default=10, ge=1)
+    per_page: int = Query(default=10, ge=1)

@@ -34,9 +34,8 @@ def get_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Dep
 @router.put('/{sid}', responses={404: {'model': HTTPError}, 400: {'model': HTTPError}})
 def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session = Depends(get_db),
                         user_id: int = Depends(get_logged_user)):
-    op = args.operation
-    name = args.name
-    qids = args.question_ids
+    append_qids = args.append_qids
+    remove_qids = args.remove_qids
 
     qs = db.query(QuestionSet).get(sid)
     if qs is None:
@@ -45,16 +44,14 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
     if not guardian.can_modify_question_set(db.query(User).get(user_id), qs):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
 
-    public = False
-    if qs.permission == EnumPermission.public:
-        public = True
+    public = qs.permission == EnumPermission.public
 
-    if op == 'append':
-        if not qids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID不能为空')
+    message = []
+
+    if append_qids:
         start = time.time()
-        questions = db.query(Question).filter(Question.id.in_(qids)).all()
-        if len(qids) != len(questions):
+        questions = db.query(Question).filter(Question.id.in_(append_qids)).all()
+        if len(append_qids) != len(questions):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID有错误')
         qs.questions.extend(questions)
         qs.modified_by_id = user_id
@@ -62,30 +59,28 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             public_set = db.query(QuestionSet).get(1)
             public_set.questions.extend(questions)
         try:
-            db.commit()
+            db.flush()
         except Exception as e:
-            db.rollback()  # 或许不需要显式rollback
+            logger.debug(e)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='不要重复插入问题')
 
         embeddings = [json.loads(question.embedding) for question in questions]
-        qids = [question.id for question in questions]
+        append_qids = [question.id for question in questions]  # 为了顺序对应，重新生成qids
 
         end = time.time()
         logger.debug('sql time: {}s', end - start)
 
-        milvus.insert('_' + str(sid), embeddings, qids)
+        milvus.insert('_' + str(sid), embeddings, append_qids)
         if public:
-            milvus.insert('_1', embeddings, qids)
+            milvus.insert('_1', embeddings, append_qids)
 
         end2 = time.time()
         logger.debug('milvus time: {}s', end2 - end)
-        return {'message': '问题库增加问题'}
+        message.append('问题库增加问题')
 
-    elif op == 'remove':
-        if not qids:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID不能为空')
-        questions = db.query(Question).filter(Question.id.in_(qids)).all()
-        if len(qids) != len(questions):
+    if remove_qids:
+        questions = db.query(Question).filter(Question.id.in_(remove_qids)).all()
+        if len(remove_qids) != len(questions):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='问题ID有错误')
         for question in questions:
             qs.questions.remove(question)
@@ -95,40 +90,37 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             for question in questions:
                 public_set.questions.remove(question)
         try:
-            db.commit()
+            db.flush()
         except Exception as e:
-            db.rollback()
             logger.debug(e)
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='未插入的问题')
 
-        milvus.delete('_' + str(sid), qids)
+        milvus.delete('_' + str(sid), remove_qids)
         if public:
-            milvus.delete('_1', qids)
-        return {'message': '问题库移除问题'}
+            milvus.delete('_1', remove_qids)
+        message.append('问题库移除问题')
 
-    elif op == 'rename':
-        if not name:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='名称不能为空')
-        qs.name = name
+    if args.name:
+        qs.name = args.name
         qs.modified_by_id = user_id
-        db.commit()
-        return {'message': '问题库更名'}
+        db.flush()
+        message.append('问题库更名')
 
-    elif op == 'public':
+    if args.permission == EnumPermission.public:
         if qs.permission != EnumPermission.public:
             qs.permission = EnumPermission.public
             qs.modified_by_id = user_id
             public_set = db.query(QuestionSet).get(1)
             questions = qs.questions
             public_set.questions.extend(questions)
-            db.commit()
+            db.flush()
 
             embeddings = [json.loads(question.embedding) for question in questions]
             qids = [question.id for question in questions]
             milvus.insert('_1', embeddings, qids)
-            return {'message': '设为公开'}
+            message.append('设为公开')
 
-    elif op == 'private':
+    if args.permission == EnumPermission.private:
         if qs.permission != EnumPermission.private:
             qs.permission = EnumPermission.private
             qs.modified_by_id = user_id
@@ -136,16 +128,19 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             questions = qs.questions
             for question in questions:
                 public_set.questions.remove(question)
-            db.commit()
+            db.flush()
 
             qids = [question.id for question in questions]
             milvus.delete('_1', qids)
-            return {'message': '设为私有'}
+            message.append('设为私有')
 
     # add maintainer
     # change owner
-
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='无法理解的操作')
+    if len(message) == 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='无法理解的操作')
+    else:
+        db.commit()
+        return {'message': message}
 
 
 @router.delete('/{sid}', responses={404: {'model': HTTPError}})
