@@ -50,24 +50,22 @@ async def login(request: Request, redirect_uri: Optional[str] = None):  # 禁止
     return await oauth.jaccount.authorize_redirect(request, redirect_uri)
 
 
-@router.get('/auth',
+@router.get('/auth', response_model=UserModel,
             openapi_extra={
-                "requestBody": {
-                    "parameters": [
-                        {
-                            "required": True,
-                            "schema": {"title": "Code", "type": "string"},
-                            "name": "code",
-                            "in": "query"
-                        },
-                        {
-                            "required": True,
-                            "schema": {"title": "State", "type": "string"},
-                            "name": "state",
-                            "in": "query"
-                        }
-                    ]
-                }
+                "parameters": [
+                    {
+                        "required": True,
+                        "schema": {"title": "Code", "type": "string"},
+                        "name": "code",
+                        "in": "query"
+                    },
+                    {
+                        "required": True,
+                        "schema": {"title": "State", "type": "string"},
+                        "name": "state",
+                        "in": "query"
+                    }
+                ]
             }
             )
 async def auth(request: Request, db: Session = Depends(get_db)):
@@ -86,7 +84,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
         db.commit()
         logger.info('New user: {}', user)
     request.session['user_id'] = user.id
-    return {'account': account}
+    return user
 
 
 @router.get('/me', response_model=UserModel, responses={401: {'model': HTTPError}})
