@@ -62,6 +62,7 @@ class QuestionSet(Base):
     # 预计大公共库占用 id=1
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(255), nullable=False)
+    description = Column(String(3000))
     questions = relationship('Question', secondary=set2question, back_populates='belongs', lazy='dynamic')
     owner_id = Column(Integer, ForeignKey('user.id'))
     owner = relationship('User', backref=backref('own', lazy='dynamic'),

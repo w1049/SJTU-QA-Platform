@@ -1,0 +1,51 @@
+from datetime import datetime
+from typing import Optional, List
+
+from pydantic import BaseModel
+
+from .user import UserName
+from ..models import EnumPermission
+
+
+class QuestionSetDetail(BaseModel):
+    """问题库的详细信息"""
+    id: int
+    name: str
+    description: Optional[str]
+    question_ids: List[int] = []
+    owner: UserName
+    maintainer: List[UserName] = []
+    modified_at: datetime
+    modified_by: UserName
+    created_at: datetime
+    created_by: UserName
+    permission: EnumPermission
+
+    # passwd
+
+    class Config:
+        orm_mode = True
+
+
+class QuestionSetList(BaseModel):
+    """用于批量列出问题库"""
+    id: int
+    name: str
+    owner: UserName
+    created_at: datetime
+    permission: EnumPermission
+
+
+class QuestionSetCreate(BaseModel):
+    """用于创建问题库"""
+    name: str
+    description: Optional[str]
+
+
+class QuestionSetUpdate(BaseModel):
+    """用于更新问题"""
+    name: Optional[str]
+    description: Optional[str]
+    append_qids: Optional[List[int]]
+    remove_qids: Optional[List[int]]
+    permission: Optional[str]

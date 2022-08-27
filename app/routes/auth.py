@@ -11,7 +11,8 @@ from starlette.responses import RedirectResponse
 from ..config import settings
 from ..dependencies import get_db, get_logged_user
 from ..models.models import User
-from ..models.schemas.schemas import HTTPError, UserModel
+from ..models.schemas.schemas import HTTPError
+from ..models.schemas.user import UserDetail
 
 router = APIRouter(
     prefix='/api',
@@ -49,7 +50,7 @@ async def login(request: Request, redirect_uri: Optional[str] = None):  # 禁止
     return await oauth.jaccount.authorize_redirect(request, redirect_uri)
 
 
-@router.get('/auth', response_model=UserModel,
+@router.get('/auth', response_model=UserDetail,
             openapi_extra={
                 "parameters": [
                     {
@@ -86,7 +87,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
     return user
 
 
-@router.get('/me', response_model=UserModel, responses={401: {'model': HTTPError}})
+@router.get('/me', response_model=UserDetail, responses={401: {'model': HTTPError}})
 def me(user_id: int = Depends(get_logged_user), db: Session = Depends(get_db)):
     return db.query(User).get(user_id)
 

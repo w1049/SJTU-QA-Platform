@@ -7,8 +7,8 @@ from loguru import logger
 from sqlalchemy.orm import Session
 
 from .. import guardian
-from ..models.schemas import schemas
 from ..dependencies import get_db, get_logged_user
+from ..models.schemas.question_set import QuestionSetDetail, QuestionSetUpdate, QuestionSetList, QuestionSetCreate
 from ..utils.milvus_util import milvus
 from ..models.models import QuestionSet, Question, User, EnumRole, EnumPermission
 from ..models.schemas.schemas import HTTPError
@@ -20,20 +20,20 @@ router = APIRouter(
 )
 
 
-@router.get('/{sid}', response_model=schemas.QuestionSetRead, responses={404: {'model': HTTPError}})
+@router.get('/{sid}', response_model=QuestionSetDetail, responses={404: {'model': HTTPError}})
 def get_question_set(sid: int, db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     question_set = db.query(QuestionSet).get(sid)
     if question_set:
         if not guardian.can_get_question_set(db.query(User).get(user_id), question_set):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
-        ret_set = schemas.QuestionSetRead.from_orm(question_set)
+        ret_set = QuestionSetDetail.from_orm(question_set)
         ret_set.question_ids = [qid[0] for qid in question_set.questions.with_entities(Question.id).all()]
         return ret_set
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
 
 
 @router.put('/{sid}', responses={404: {'model': HTTPError}, 400: {'model': HTTPError}})
-def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session = Depends(get_db),
+def update_question_set(sid: int, args: QuestionSetUpdate, db: Session = Depends(get_db),
                         user_id: int = Depends(get_logged_user)):
     append_qids = args.append_qids
     remove_qids = args.remove_qids
@@ -107,6 +107,12 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         db.flush()
         message.append('问题库更名')
 
+    if args.description:
+        qs.description = args.description
+        qs.modified_by_id = user_id
+        db.flush()
+        message.append('问题库更改描述')
+
     if args.permission == EnumPermission.public.value:
         if qs.permission != EnumPermission.public:
             qs.permission = EnumPermission.public
@@ -157,7 +163,7 @@ def delete_question_set(sid: int, db: Session = Depends(get_db), user_id: int = 
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
 
 
-@router.get('/', response_model=List[schemas.QuestionSetModel])
+@router.get('/', response_model=List[QuestionSetList])
 def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
     if not user:
@@ -167,14 +173,14 @@ def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_
     return user.maintain.all()
 
 
-@router.post('/', response_model=schemas.QuestionSetModel, status_code=status.HTTP_201_CREATED)
-def create_question_set(args: schemas.QuestionSetCreate, db: Session = Depends(get_db),
+@router.post('/', response_model=QuestionSetDetail, status_code=status.HTTP_201_CREATED)
+def create_question_set(args: QuestionSetCreate, db: Session = Depends(get_db),
                         user_id: int = Depends(get_logged_user)):
-    name = args.name
     user = db.query(User).get(user_id)
     if not guardian.can_create_question_set(user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
-    qs = QuestionSet(name=name,
+    qs = QuestionSet(name=args.name,
+                     description=args.description,
                      created_by=user,
                      owner=user,
                      modified_by=user)
