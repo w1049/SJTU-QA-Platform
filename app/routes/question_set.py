@@ -106,7 +106,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
         db.flush()
         message.append('问题库更名')
 
-    if args.permission == EnumPermission.public:
+    if args.permission == EnumPermission.public.value:
         if qs.permission != EnumPermission.public:
             qs.permission = EnumPermission.public
             qs.modified_by_id = user_id
@@ -120,7 +120,7 @@ def update_question_set(sid: int, args: schemas.QuestionSetUpdate, db: Session =
             milvus.insert('_1', embeddings, qids)
             message.append('设为公开')
 
-    if args.permission == EnumPermission.private:
+    if args.permission == EnumPermission.private.value:
         if qs.permission != EnumPermission.private:
             qs.permission = EnumPermission.private
             qs.modified_by_id = user_id
