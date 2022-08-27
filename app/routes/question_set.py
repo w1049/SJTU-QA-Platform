@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from .. import guardian
 from ..dependencies import get_db, get_logged_user
-from ..models.schemas.question_set import QuestionSetDetail, QuestionSetUpdate, QuestionSetList, QuestionSetCreate
+from ..models.schemas.question_set import QuestionSetDetail, QuestionSetUpdate, QuestionSetList, QuestionSetCreate, \
+    QuestionSetCreated
 from ..utils.milvus_util import milvus
 from ..models.models import QuestionSet, Question, User, EnumRole, EnumPermission
 from ..models.schemas.schemas import HTTPError
@@ -173,7 +174,7 @@ def get_question_sets(db: Session = Depends(get_db), user_id: int = Depends(get_
     return user.maintain.all()
 
 
-@router.post('/', response_model=QuestionSetDetail, status_code=status.HTTP_201_CREATED)
+@router.post('/', response_model=QuestionSetCreated, status_code=status.HTTP_201_CREATED)
 def create_question_set(args: QuestionSetCreate, db: Session = Depends(get_db),
                         user_id: int = Depends(get_logged_user)):
     user = db.query(User).get(user_id)
@@ -188,7 +189,6 @@ def create_question_set(args: QuestionSetCreate, db: Session = Depends(get_db),
 
     db.add(qs)
     db.commit()
-    db.refresh(qs)
 
     collection_name = '_' + str(qs.id)
     milvus.create_collection(collection_name)  # 按理说这个名字的 collection 是不存在的

@@ -29,6 +29,14 @@ class QuestionCreate(BaseModel):
     content: str
 
 
+class QuestionCreated(QuestionCreate):
+    """创建后返回的信息"""
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 class QuestionUpdate(BaseModel):
     """用于更新问题"""
     title: Optional[str]

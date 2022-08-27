@@ -1,7 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
+from sqlalchemy.orm import Query
 
 from .user import UserName
 from ..models import EnumPermission
@@ -26,6 +27,12 @@ class QuestionSetDetail(BaseModel):
     class Config:
         orm_mode = True
 
+    @validator("*", pre=True)
+    def evaluate_lazy_columns(cls, v):
+        if isinstance(v, Query):
+            return v.all()
+        return v
+
 
 class QuestionSetList(BaseModel):
     """用于批量列出问题库"""
@@ -40,6 +47,14 @@ class QuestionSetCreate(BaseModel):
     """用于创建问题库"""
     name: str
     description: Optional[str]
+
+
+class QuestionSetCreated(QuestionSetCreate):
+    """创建后返回的信息"""
+    id: int
+
+    class Config:
+        orm_mode = True
 
 
 class QuestionSetUpdate(BaseModel):
