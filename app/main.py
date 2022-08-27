@@ -14,7 +14,7 @@ from .config import settings, setup_logging
 from .dependencies import get_db, get_user
 from .guardian import can_get_question_set
 from .utils.milvus_util import milvus
-from .models import User, Question, QuestionSet
+from .models.models import User, Question, QuestionSet
 from .routes import question, question_set, auth
 
 app = FastAPI()

@@ -1,4 +1,4 @@
-from .models import User, QuestionSet, Question, EnumRole, EnumPermission
+from .models.models import User, QuestionSet, Question, EnumRole, EnumPermission
 
 
 def can_create_question(user: User):

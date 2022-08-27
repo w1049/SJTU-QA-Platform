@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine
 from .utils.milvus_util import milvus
-from .models import *
+from .models.models import *
 
 
 @click.command()

@@ -6,13 +6,12 @@ from authlib.oidc.core import CodeIDToken
 from fastapi import Request, APIRouter, Depends, HTTPException
 from loguru import logger
 from sqlalchemy.orm import Session
-from starlette.config import Config
 from starlette.responses import RedirectResponse
 
 from ..config import settings
 from ..dependencies import get_db, get_logged_user
-from ..models import User
-from ..schemas import HTTPError, UserModel
+from ..models.models import User
+from ..models.schemas.schemas import HTTPError, UserModel
 
 router = APIRouter(
     prefix='/api',

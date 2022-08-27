@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import Query
 from pydantic import BaseModel
 
-from .models import EnumRole, EnumPermission
+from ..models import EnumRole, EnumPermission
 
 
 class UserModel(BaseModel):
