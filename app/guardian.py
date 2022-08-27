@@ -43,11 +43,10 @@ def can_create_question_set(user: User):
 
 
 def can_get_question_set(user: User, question_set: QuestionSet):  # 和 can_query 是否要区分开？
+    if question_set.permission == EnumPermission.public:
+        return True
     if not user:
-        if question_set.permission == EnumPermission.public:
-            return True
-        else:
-            return False
+        return False
     if user.role == EnumRole.admin:
         return True
     if user in question_set.maintainer:
