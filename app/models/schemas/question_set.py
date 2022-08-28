@@ -42,6 +42,9 @@ class QuestionSetList(BaseModel):
     created_at: datetime
     permission: EnumPermission
 
+    class Config:
+        orm_mode = True
+
 
 class QuestionSetCreate(BaseModel):
     """用于创建问题库"""
