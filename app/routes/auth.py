@@ -11,7 +11,7 @@ from starlette.responses import RedirectResponse
 from ..config import settings
 from ..dependencies import get_db, get_logged_user
 from ..models.models import User
-from ..models.schemas.schemas import HTTPError
+from ..models.schemas import HTTPError
 from ..models.schemas.user import UserDetail
 
 router = APIRouter(

@@ -8,11 +8,11 @@ from sqlalchemy.orm import Session
 
 from .. import guardian
 from ..dependencies import get_db, get_logged_user
+from ..models.models import QuestionSet, Question, User, EnumRole, EnumPermission
+from ..models.schemas import HTTPError
 from ..models.schemas.question_set import QuestionSetDetail, QuestionSetUpdate, QuestionSetList, QuestionSetCreate, \
     QuestionSetCreated
-from ..utils.milvus_util import milvus
-from ..models.models import QuestionSet, Question, User, EnumRole, EnumPermission
-from ..models.schemas.schemas import HTTPError
+from ..utils import milvus
 
 router = APIRouter(
     prefix='/api/question_set',

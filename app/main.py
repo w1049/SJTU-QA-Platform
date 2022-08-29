@@ -2,26 +2,24 @@ import os
 import time
 from typing import Optional
 
-from loguru import logger
 from fastapi import FastAPI, Depends, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
+from loguru import logger
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-from .utils import rocketqa
-from .config import settings, setup_logging
+from .config import settings
 from .dependencies import get_db, get_user
 from .guardian import can_get_question_set
-from .utils.milvus_util import milvus
 from .models.models import User, Question, QuestionSet
-from .routes import question, question_set, auth
+from .routes import router
+from .utils import milvus, rocketqa
+from .utils.logging import setup_logging
 
 app = FastAPI()
 
-app.include_router(question.router)
-app.include_router(question_set.router)
-app.include_router(auth.router)
+app.include_router(router)
 
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 app.add_middleware(

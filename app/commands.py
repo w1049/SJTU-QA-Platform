@@ -2,8 +2,8 @@ import click
 from sqlalchemy.orm import Session
 
 from .database import engine
-from .utils.milvus_util import milvus
 from .models.models import *
+from .utils import milvus
 
 
 @click.command()

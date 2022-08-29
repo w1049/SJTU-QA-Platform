@@ -3,8 +3,9 @@
 import json
 import time
 
-import rocketqa
 from tornado import ioloop, web, httpserver
+
+import rocketqa
 
 
 class RocketQAServer(web.RequestHandler):

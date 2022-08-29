@@ -2,17 +2,15 @@ import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from loguru import logger
 from sqlalchemy.orm import Session
 
 from .. import guardian
-from ..models.schemas.question import QuestionDetail, QuestionUpdate, QuestionListPage, QuestionCreate, QuestionCreated
-from ..utils import rocketqa
 from ..database import SessionLocal
 from ..dependencies import get_db, get_logged_user
-from ..utils.milvus_util import milvus
 from ..models.models import Question, QuestionSet, User, EnumRole
-from ..models.schemas.schemas import HTTPError, Pager
+from ..models.schemas import HTTPError, Pager
+from ..models.schemas.question import QuestionDetail, QuestionUpdate, QuestionListPage, QuestionCreate, QuestionCreated
+from ..utils import milvus, rocketqa
 
 router = APIRouter(
     prefix='/api/question',

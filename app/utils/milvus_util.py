@@ -76,7 +76,7 @@ class MilvusUtil:
             logger.error('Milvus delete error: {}', e)
 
     def search(self, name, vector, top_k):
-        param = {'nprobe': 20}
+        # param = {'nprobe': 20}
         try:
             status, results = self.client.search(
                 collection_name=name,
@@ -86,6 +86,3 @@ class MilvusUtil:
             return status, results
         except Exception as e:
             logger.error('Milvus search error: {}', e)
-
-
-milvus = MilvusUtil()
