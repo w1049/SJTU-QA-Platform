@@ -9,6 +9,7 @@ itsdangerous==2.1.2
 httpx==0.23.0
 requests==2.28.1
 loguru==0.6.0
+prometheus-fastapi-instrumentator==5.9.1
 
 protobuf==3.20.0
 grpcio==1.48.0

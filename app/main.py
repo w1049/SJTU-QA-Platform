@@ -7,6 +7,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from .config import settings
 from .routes import router
+from .utils import instrumentator
 from .utils.logging import setup_logging
 
 app = FastAPI()
@@ -26,10 +27,11 @@ setup_logging()
 
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     logger.info('Server [{}] starting...', os.getpid())
+    instrumentator.instrument(app).expose(app, include_in_schema=True)
 
 
 @app.on_event("shutdown")
-def shutdown_event():
+async def shutdown_event():
     logger.info('Server [{}] shutdown.', os.getpid())

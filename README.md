@@ -20,10 +20,12 @@ services:
             MILVUS_PORT: 19530
             ROCKETQA_URL: http://rocketqa:25565/rocketqa
             DATABASE_URI: postgresql+psycopg2://admin:123456@db:5432/test
+            PROMETHEUS_MULTIPROC_DIR: /app/metrics
             LOG_LEVEL: INFO
         volumes:
             - ./SJTU-QA-Platform/templates:/app/templates
             - ./SJTU-QA-Platform/logs:/app/logs
+            - ./metrics:/app/metrics
         depends_on:
             - rocketqa
             - db
