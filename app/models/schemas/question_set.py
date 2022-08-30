@@ -51,6 +51,7 @@ class QuestionSetCreate(BaseModel):
     """用于创建问题库"""
     name: str
     description: Optional[str]
+    permission: EnumPermission = EnumPermission.private
 
 
 class QuestionSetCreated(QuestionSetCreate):

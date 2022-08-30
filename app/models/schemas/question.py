@@ -27,6 +27,7 @@ class QuestionCreate(BaseModel):
     """用于创建问题"""
     title: str
     content: str
+    sid: Optional[int] = None
 
 
 class QuestionCreated(QuestionCreate):

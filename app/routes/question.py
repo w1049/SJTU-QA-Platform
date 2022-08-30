@@ -1,12 +1,14 @@
 import json
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response
+from loguru import logger
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_200_OK
 
 from ..dependencies import get_db, get_logged_user
-from ..models.models import Question, QuestionSet, User, EnumRole
+from ..models.models import Question, QuestionSet, User, EnumRole, EnumPermission
 from ..models.schemas import HTTPError, Pager
 from ..models.schemas.question import QuestionDetail, QuestionUpdate, QuestionListPage, QuestionCreate, QuestionCreated
 from ..utils import milvus, rocketqa, guardian
@@ -46,8 +48,15 @@ def get_questions(sid: Optional[int] = None, pager: Pager = Depends(),
 @router.post('/', response_model=QuestionCreated, status_code=status.HTTP_201_CREATED)
 async def create_question(args: QuestionCreate, user_id: int = Depends(get_logged_user)):
     with SessionLocal() as db:
-        if not guardian.can_create_question(db.query(User).get(user_id)):
+        user = db.query(User).get(user_id)
+        if not guardian.can_create_question(user):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+        if args.sid:
+            qs = db.query(QuestionSet).get(args.sid)
+            if qs is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
+            if not guardian.can_modify_question_set(user, qs):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
     title, content = args.title, args.content
     emb_array = await rocketqa.async_get_para(title, content)
     embedding = json.dumps(emb_array)  # dumps 只出现在了这里
@@ -56,6 +65,28 @@ async def create_question(args: QuestionCreate, user_id: int = Depends(get_logge
         question.created_by_id = user_id
         question.modified_by_id = user_id
         db.add(question)
+        if args.sid:
+            db.flush()
+            qs = db.query(QuestionSet).get(args.sid)
+            public = qs.permission == EnumPermission.public
+            start = time.time()
+            qs.questions.append(question)
+            qs.modified_by_id = user_id
+            if public:
+                public_set = db.query(QuestionSet).get(1)
+                public_set.questions.append(question)
+
+            db.flush()
+
+            end = time.time()
+            logger.debug('sql time: {}s', end - start)
+
+            milvus.insert('_' + str(args.sid), [emb_array], [question.id])
+            if public:
+                milvus.insert('_1', [emb_array], [question.id])
+
+            end2 = time.time()
+            logger.debug('milvus time: {}s', end2 - end)
         db.commit()
         question = QuestionCreated.from_orm(question)
         return question

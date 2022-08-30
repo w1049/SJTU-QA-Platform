@@ -182,6 +182,7 @@ def create_question_set(args: QuestionSetCreate, db: Session = Depends(get_db),
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
     qs = QuestionSet(name=args.name,
                      description=args.description,
+                     permission=args.permission,
                      created_by=user,
                      owner=user,
                      modified_by=user)
