@@ -38,6 +38,7 @@ class QuestionSetList(BaseModel):
     """用于批量列出问题库"""
     id: int
     name: str
+    description: Optional[str]
     owner: UserName
     created_at: datetime
     permission: EnumPermission
@@ -61,7 +62,7 @@ class QuestionSetCreated(QuestionSetCreate):
 
 
 class QuestionSetUpdate(BaseModel):
-    """用于更新问题"""
+    """用于更新问题库"""
     name: Optional[str]
     description: Optional[str]
     append_qids: Optional[List[int]]
