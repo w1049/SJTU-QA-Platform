@@ -1,16 +1,16 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
+from starlette.status import HTTP_200_OK
 
-from .. import guardian
-from ..database import SessionLocal
 from ..dependencies import get_db, get_logged_user
 from ..models.models import Question, QuestionSet, User, EnumRole
 from ..models.schemas import HTTPError, Pager
 from ..models.schemas.question import QuestionDetail, QuestionUpdate, QuestionListPage, QuestionCreate, QuestionCreated
-from ..utils import milvus, rocketqa
+from ..utils import milvus, rocketqa, guardian
+from ..utils.database import SessionLocal
 
 router = APIRouter(
     prefix='/api/question',
@@ -130,5 +130,5 @@ def delete_question(qid: int, db: Session = Depends(get_db), user_id: int = Depe
             milvus.delete(collection_name, [qid])
         db.delete(question)
         db.commit()
-        return {'ok': True}
+        return Response(status_code=HTTP_200_OK)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Question not found')

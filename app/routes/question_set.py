@@ -2,17 +2,17 @@ import json
 import time
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from loguru import logger
 from sqlalchemy.orm import Session
+from starlette.status import HTTP_200_OK
 
-from .. import guardian
 from ..dependencies import get_db, get_logged_user
 from ..models.models import QuestionSet, Question, User, EnumRole, EnumPermission
 from ..models.schemas import HTTPError
 from ..models.schemas.question_set import QuestionSetDetail, QuestionSetUpdate, QuestionSetList, QuestionSetCreate, \
     QuestionSetCreated
-from ..utils import milvus
+from ..utils import milvus, guardian
 
 router = APIRouter(
     prefix='/api/question_set',
@@ -148,7 +148,7 @@ def update_question_set(sid: int, args: QuestionSetUpdate, db: Session = Depends
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='无法理解的操作')
     else:
         db.commit()
-        return {'message': message}
+        return Response(status_code=HTTP_200_OK)
 
 
 @router.delete('/{sid}', responses={404: {'model': HTTPError}})
@@ -160,7 +160,7 @@ def delete_question_set(sid: int, db: Session = Depends(get_db), user_id: int = 
         milvus.drop_collection('_' + str(question_set.id))
         db.delete(question_set)
         db.commit()
-        return {'ok': True}
+        return Response(status_code=HTTP_200_OK)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
 
 

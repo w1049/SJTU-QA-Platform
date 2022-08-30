@@ -3,10 +3,10 @@ from typing import Optional
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from authlib.jose import jwt
 from authlib.oidc.core import CodeIDToken
-from fastapi import Request, APIRouter, Depends, HTTPException
+from fastapi import Request, APIRouter, Depends, HTTPException, Response
 from loguru import logger
 from sqlalchemy.orm import Session
-from starlette.responses import RedirectResponse
+from starlette.status import HTTP_200_OK
 
 from ..config import settings
 from ..dependencies import get_db, get_logged_user
@@ -95,4 +95,4 @@ def me(user_id: int = Depends(get_logged_user), db: Session = Depends(get_db)):
 @router.get('/logout')
 async def logout(request: Request):
     request.session.pop('user_id', None)
-    return {'ok': 'True'}
+    return Response(status_code=HTTP_200_OK)

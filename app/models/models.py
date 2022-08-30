@@ -5,7 +5,7 @@ from sqlalchemy import Column, Enum, ForeignKey, Integer, Table, String, Primary
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship, backref
 
-from ..database import Base
+from ..utils.database import Base
 
 
 class EnumRole(enum.Enum):
