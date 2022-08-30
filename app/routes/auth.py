@@ -95,4 +95,4 @@ def me(user_id: int = Depends(get_logged_user), db: Session = Depends(get_db)):
 @router.get('/logout')
 async def logout(request: Request):
     request.session.pop('user_id', None)
-    return RedirectResponse(url='/')
+    return {'ok': 'True'}
