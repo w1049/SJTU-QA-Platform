@@ -42,10 +42,10 @@ class RocketQAServer(web.RequestHandler):
             output['result'] = q_embs
 
         elif input_data['step'] == 3:
-            title = input_data['title']
-            para = input_data['para']
+            titles = input_data['titles']
+            paras = input_data['paras']
             start = time.time()
-            q_embs = self._dual_encoder.encode_para(title=[title], para=[para])
+            q_embs = self._dual_encoder.encode_para(title=titles, para=paras)
             q_embs = [x.tolist() for x in list(q_embs)]
             end = time.time()
             print('encode para: {}s'.format(end - start))

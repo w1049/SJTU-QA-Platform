@@ -1,8 +1,10 @@
+import csv
 import json
 import time
-from typing import Optional
+from io import StringIO
+from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile
 from loguru import logger
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_200_OK
@@ -90,6 +92,70 @@ async def create_question(args: QuestionCreate, user_id: int = Depends(get_logge
         db.commit()
         question = QuestionCreated.from_orm(question)
         return question
+
+
+@router.post('/csv', response_model=List[QuestionCreated], status_code=status.HTTP_201_CREATED)
+async def create_questions(file: UploadFile, sid: Optional[int] = None, user_id: int = Depends(get_logged_user)):
+    with SessionLocal() as db:
+        user = db.query(User).get(user_id)
+        if not guardian.can_create_question(user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+        if sid:
+            qs = db.query(QuestionSet).get(sid)
+            if qs is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='QuestionSet not found')
+            if not guardian.can_modify_question_set(user, qs):
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+    titles = []
+    contents = []
+    try:
+        content = await file.read()
+        read_csv = csv.reader(StringIO(content.decode('utf-8')))
+        for line in read_csv:
+            titles.append(line[0])
+            contents.append(line[1])
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot read file')
+    finally:
+        await file.close()
+    questions = []
+    logger.debug(titles)
+    logger.debug(contents)
+    emb_arrays = await rocketqa.async_get_paras(titles, contents)
+    logger.debug('rocketqa ok')
+    with SessionLocal() as db:
+        for i, emb_array in enumerate(emb_arrays):
+            embedding = json.dumps(emb_array)
+            question = Question(title=titles[i], content=contents[i], embedding=embedding)
+            question.created_by_id = user_id
+            question.modified_by_id = user_id
+            questions.append(question)
+        db.add_all(questions)
+        if sid:
+            db.flush()
+            qids = [question.id for question in questions]
+            qs = db.query(QuestionSet).get(sid)
+            public = qs.permission == EnumPermission.public
+            start = time.time()
+            qs.questions.extend(questions)
+            qs.modified_by_id = user_id
+            if public:
+                public_set = db.query(QuestionSet).get(1)
+                public_set.questions.extend(questions)
+
+            db.flush()
+
+            end = time.time()
+            logger.debug('sql time: {}s', end - start)
+
+            milvus.insert('_' + str(sid), emb_arrays, qids)
+            if public:
+                milvus.insert('_1', emb_arrays, qids)
+
+            end2 = time.time()
+            logger.debug('milvus time: {}s', end2 - end)
+        db.commit()
+        return [QuestionCreated.from_orm(question) for question in questions]
 
 
 @router.get('/search', response_model=QuestionListPage, responses={404: {'model': HTTPError}},

@@ -30,9 +30,11 @@ class QuestionCreate(BaseModel):
     sid: Optional[int] = None
 
 
-class QuestionCreated(QuestionCreate):
+class QuestionCreated(BaseModel):
     """创建后返回的信息"""
     id: int
+    title: str
+    content: str
 
     class Config:
         orm_mode = True
