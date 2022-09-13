@@ -14,7 +14,7 @@ def get_embedding(query):
 
 
 def get_para(title, para):
-    input_data = {'step': 3, 'title': title, 'para': para}
+    input_data = {'step': 3, 'titles': [title], 'paras': [para]}
     result = httpx.post(settings.rocketqa_url, json=input_data, timeout=30.0)
     res_json = json.loads(result.text)
     return res_json['result'][0]
