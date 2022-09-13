@@ -60,7 +60,7 @@ def create_rocketqa_app(sub_address, rocketqa_server):
         "model": 'zh_dureader_de_v2',
         "use_cuda": False,
         "device_id": 0,
-        "batch_size": 32
+        "batch_size": 1
     }
     dual_encoder = rocketqa.load_model(**de_conf)
     return web.Application([(sub_address, rocketqa_server, dict(dual_encoder=dual_encoder))])
