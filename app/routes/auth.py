@@ -6,6 +6,7 @@ from authlib.oidc.core import CodeIDToken
 from fastapi import Request, APIRouter, Depends, HTTPException, Response
 from loguru import logger
 from sqlalchemy.orm import Session
+from starlette.responses import RedirectResponse
 from starlette.status import HTTP_200_OK
 
 from ..config import settings
@@ -64,11 +65,18 @@ async def login(request: Request, redirect_uri: Optional[str] = None):  # 禁止
                         "schema": {"title": "State", "type": "string"},
                         "name": "state",
                         "in": "query"
+                    },
+                    {
+                        "required": False,
+                        "schema": {"title": "Redirect Uri", "type": "string"},
+                        "name": "redirect_uri",
+                        "in": "query"
                     }
                 ]
-            }
+            },
+            description="有redirect_uri时，返回307 redirect"
             )
-async def auth(request: Request, db: Session = Depends(get_db)):
+async def auth(request: Request, redirect_uri: Optional[str] = None, db: Session = Depends(get_db)):
     try:
         token = await oauth.jaccount.authorize_access_token(request)
     except OAuthError:
@@ -84,6 +92,8 @@ async def auth(request: Request, db: Session = Depends(get_db)):
         db.commit()
         logger.info('New user: {}', user)
     request.session['user_id'] = user.id
+    if redirect_uri:
+        return RedirectResponse(redirect_uri)
     return user
 
 
