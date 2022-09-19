@@ -4,7 +4,7 @@ import time
 from io import StringIO
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, status, Response, UploadFile,BackgroundTasks
 from loguru import logger
 from sqlalchemy.orm import Session
 from starlette.status import HTTP_200_OK
@@ -13,7 +13,7 @@ from ..dependencies import get_db, get_logged_user
 from ..models.models import Question, QuestionSet, User, EnumRole, EnumPermission
 from ..models.schemas import HTTPError, Pager
 from ..models.schemas.question import QuestionDetail, QuestionUpdate, QuestionListPage, QuestionCreate, QuestionCreated
-from ..utils import milvus, rocketqa, guardian
+from ..utils import milvus, rocketqa, guardian, background_rocketqa
 from ..utils.database import SessionLocal
 
 router = APIRouter(
@@ -94,8 +94,9 @@ async def create_question(args: QuestionCreate, user_id: int = Depends(get_logge
         return question
 
 
-@router.post('/csv', response_model=List[QuestionCreated], status_code=status.HTTP_201_CREATED)
-async def create_questions(file: UploadFile, sid: Optional[int] = None, user_id: int = Depends(get_logged_user)):
+@router.post('/csv', response_model=List[QuestionCreated], status_code=status.HTTP_202_ACCEPTED)
+async def create_questions(file: UploadFile, background_tasks: BackgroundTasks,
+                           sid: Optional[int] = None, user_id: int = Depends(get_logged_user)):
     with SessionLocal() as db:
         user = db.query(User).get(user_id)
         if not guardian.can_create_question(user):
@@ -122,19 +123,20 @@ async def create_questions(file: UploadFile, sid: Optional[int] = None, user_id:
     questions = []
     logger.debug(titles)
     logger.debug(contents)
-    emb_arrays = await rocketqa.async_get_paras(titles, contents)
+    # emb_arrays = await rocketqa.async_get_paras(titles, contents)
     logger.debug('rocketqa ok')
     with SessionLocal() as db:
-        for i, emb_array in enumerate(emb_arrays):
-            embedding = json.dumps(emb_array)
-            question = Question(title=titles[i], content=contents[i], embedding=embedding)
+        # for i, emb_array in enumerate(emb_arrays):
+        for title, content in zip(titles, contents):
+            question = Question(title=title, content=content)
+            # embedding = json.dumps(emb_array)
+            question.embedding = ''
             question.created_by_id = user_id
             question.modified_by_id = user_id
             questions.append(question)
         db.add_all(questions)
         if sid:
             db.flush()
-            qids = [question.id for question in questions]
             qs = db.query(QuestionSet).get(sid)
             public = qs.permission == EnumPermission.public
             start = time.time()
@@ -149,13 +151,15 @@ async def create_questions(file: UploadFile, sid: Optional[int] = None, user_id:
             end = time.time()
             logger.debug('sql time: {}s', end - start)
 
-            milvus.insert('_' + str(sid), emb_arrays, qids)
-            if public:
-                milvus.insert('_1', emb_arrays, qids)
+            # qids = [question.id for question in questions]
+            # milvus.insert('_' + str(sid), emb_arrays, qids)
+            # if public:
+            #     milvus.insert('_1', emb_arrays, qids)
 
-            end2 = time.time()
-            logger.debug('milvus time: {}s', end2 - end)
+            # end2 = time.time()
+            # logger.debug('milvus time: {}s', end2 - end)
         db.commit()
+        background_tasks.add_task(background_rocketqa.create, titles, contents, questions, sid, public)
         return [QuestionCreated.from_orm(question) for question in questions]
 
 
