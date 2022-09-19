@@ -110,11 +110,12 @@ async def create_questions(file: UploadFile, sid: Optional[int] = None, user_id:
     contents = []
     try:
         content = await file.read()
-        read_csv = csv.reader(StringIO(content.decode('utf-8')))
-        for line in read_csv:
-            titles.append(line[0])
-            contents.append(line[1])
-    except Exception:
+        read_csv = csv.DictReader(StringIO(content.decode('utf-8')))
+        for q in read_csv:
+            titles.append(q['title'])
+            contents.append(q['content'])
+    except Exception as e:
+        print(e)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot read file')
     finally:
         await file.close()
