@@ -9,6 +9,7 @@ from starlette.status import HTTP_200_OK
 
 from ..dependencies import get_db, get_user
 from ..models.models import User, Question, QuestionSet
+from ..models.schemas.question import QuestionListPage
 from ..utils import milvus, rocketqa, guardian, templates
 
 router = APIRouter()
@@ -51,6 +52,13 @@ def _query(query_str: str, set_id: int, db: Session, user_id: Optional[int] = No
             raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail="Please login")
         else:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Permission denied')
+    if len(query_str) <= 4:
+        questions = question_set.questions.filter(Question.title.like(f'%{query_str}%')).limit(5).all()
+        output = []
+        for question in questions:
+            output.append({'title': question.title, 'content': question.content})
+        return output
+
     start = time.time()
     embedding = rocketqa.get_embedding(query_str)
     end = time.time()
